@@ -1,0 +1,10 @@
+/hub/bin/
+/hub/cmake-build-debug/
+/client/bin/
+/client/include/spectranet
+/client/libs/
+*.o
+*_p.asm
+*_np.asm
+*.lib
+deployment.xml

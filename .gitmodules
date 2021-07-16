@@ -1,0 +1,9 @@
+[submodule "hub/json"]
+	path = hub/json
+	url = https://github.com/nlohmann/json.git
+[submodule "hub/img2spec"]
+	path = hub/img2spec
+	url = https://github.com/the-channels/img2spec.git
+[submodule "hub/cpr"]
+	path = hub/cpr
+	url = https://github.com/whoshuu/cpr.git
