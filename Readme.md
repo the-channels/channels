@@ -4,6 +4,10 @@ ZX Spectrum client for imageboards.
 
 https://user-images.githubusercontent.com/1666014/126671608-02e74708-55c7-4141-b330-0c9b010e1c9d.mov
 
+## Download
+
+You can do that from the [Releases](https://github.com/the-channels/channels/releases) page.
+
 ## Requirements
 * Because speccy does not support any internet connectivity by default, you'll need [Spectranet Cartridge](https://www.bytedelight.com/?page_id=3515). It may be pricey and hard to get, but please support the manufacturer as it's a very Niche product.
 * [Fuse Enumator](http://fuse-emulator.sourceforge.net/) supports such cartrige, you'll just need to enable it via "Peripherials->Spectranet" radio button
