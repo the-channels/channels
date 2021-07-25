@@ -1,6 +1,9 @@
 /hub/bin/
 /hub/cmake-build-debug/
+/hub/cmake-build-release-visual-studio/
 /client/bin/
+/client/.idea
+/hub/.idea
 /client/include/spectranet
 /client/libs/
 *.o

@@ -25,8 +25,6 @@ add_custom_target(create_cache_folder ALL
 
 if(WIN32)
 
-add_dependencies(channel_hub copy_sdl)
-
 target_link_libraries(channel_hub legacy_stdio_definitions.lib)
 set(OPENSSL_ROOT_DIR "C:/Program Files/OpenSSL-Win64")
 else()

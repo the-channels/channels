@@ -45,7 +45,7 @@ int main(int argc, const char** argv)
         }
     }
 
-    std::cout << "Starting hub" << port << std::endl;
+    std::cout << "Starting hub on port " << port << std::endl;
 
     SocketChannelHub hub(port);
     return hub.run();
