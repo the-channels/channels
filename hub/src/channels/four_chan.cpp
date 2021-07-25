@@ -1,6 +1,7 @@
 #include "four_chan.h"
 #include <cpr/cpr.h>
 #include "json.hpp"
+#include <iostream>
 
 std::string FourChan::s_base_url = "https://a.4cdn.org";
 
@@ -30,6 +31,7 @@ CallbackStatus FourChan::get_attachment(const BoardId &board, const ThreadId &th
 
     if (r.status_code != 200)
     {
+        std::cerr << "Error:" << r.status_code << std::endl;
         return CallbackStatus::failed;
     }
 

@@ -13,8 +13,8 @@ You can do that from the [Releases](https://github.com/the-channels/channels/rel
 * [Fuse Enumator](http://fuse-emulator.sourceforge.net/) supports such cartrige, you'll just need to enable it via "Peripherials->Spectranet" radio button
 
 ## To Do List
-1. Refactor img2spec tool and split display and processing logic in separate static
-   library with no executable
+1. ~~Refactor img2spec tool and split display and processing logic in separate static
+   library with no executable~~
 2. Ability to save settings
 3. Tracking and showing replies to particular post
 4. Posting
@@ -34,20 +34,13 @@ A special proxy called Hub (`hub/` folder) is supposed to be run somewhere on yo
 A client and the hub communicate via a special protocol, as described in [this document](./proto/Readme.md).
 
 ## How to build from source
-* The Hub is simply compiled using CMake. 
+* The Hub is simply compiled using CMake. The only dependency is openssl.
 * Take care to fetch all submodules.
 * The Client uses Makefiles and can only be compiled using [z88dk](https://github.com/z88dk/z88dk)
 * You'd need UNIX to compile the client, so for Windows, you would need to use WSL
 * Having all that done, then simply shoot `make`
 * While it's included in this repository, 
   you may refer to [spectranet dev library and headers](https://github.com/spectrumero/spectranet)
-
-##### Windows
-* You need a copy of [SDL2 Development Libraries](https://www.libsdl.org/download-2.0.php), copied into `SDL2` folder next to this repository.
-The runtime library is actually included in this repository.
-
-##### Mac Os X
-* You need a copy of [SDL2 Development Libraries](https://www.libsdl.org/download-2.0.php) from inside of the .dmg file (`SDL2.framework`), copied to `/Library/Frameworks`.
 
 ##### Linux
 Install these:
@@ -57,24 +50,27 @@ sudo apt-get install -y \
     gcc \
     git \
     g++ \
-    libgtk-3-0 gtk+-3.0 \
     gcc-multilib \
     g++-multilib \
     build-essential \
     xutils-dev \
     libssl-dev \
-    libsdl2-dev \
-    libsdl2-gfx-dev \
-    libsdl2-image-dev \
-    libsdl2-mixer-dev \
-    libsdl2-net-dev \
-    libsdl2-ttf-dev \
-    libreadline6-dev \
-    libncurses5-dev \
-    mingw-w64 \
     cmake
 ```
 Proceed with cmake as usual.
+
+##### Docker
+It is also available as a [docker image](https://hub.docker.com/repository/docker/desertkun/channels-hub):
+```bash
+docker run -d --tmpfs /channels/hub/bin/cache -p 9493:9493 -it desertkun/channels-hub:latest
+```
+You can build a local image if you want:
+```bash
+# build
+docker build -t channel_hub -f Dockerfile.hub .
+# run
+docker run -d --tmpfs /channels/hub/bin/cache -p 9493:9493 -it channel_hub
+```
 
 ## Debugging
 * The only way to debug is to use netlog, a printf-alike function that

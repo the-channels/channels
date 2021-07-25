@@ -17,6 +17,8 @@ struct CachedImage
     uint32_t h;
 };
 
+class Device;
+
 class ImageProcessing
 {
 public:
@@ -45,18 +47,19 @@ public:
     }
 public:
     ImageProcessing();
+    ~ImageProcessing();
     GetImageResult reencode_image(const std::string& source_file,
         uint32_t source_w, uint32_t source_h,
         uint32_t target_w, uint32_t target_h,
         ImageEncoding encoding);
 
 private:
-    std::string generate_config(ImageEncoding encoding,
+    Device* obtain_encoding_device(ImageEncoding encoding,
         float image_scale, bool linear_order, uint16_t target_w, uint16_t target_h);
 
 private:
-    nlohmann::basic_json<> m_color_zx;
-    nlohmann::basic_json<> m_grayscale_zx;
+    Device* m_color_zx;
+    Device* m_grayscale_zx;
     std::map<std::string, CachedImage> m_image_cache;
     std::mutex m_image_cache_mutex;
 };

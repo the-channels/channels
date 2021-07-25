@@ -1,0 +1,17 @@
+FROM alpine:3
+RUN apk update && apk add --no-cache cmake git build-base openssl openssl-libs-static openssl-dev
+
+RUN mkdir /channels && mkdir /channels/hub/ && mkdir /channels/hub/bin && mkdir /channels/hub/bin/cache
+ADD hub/configurations /channels/hub/configurations
+ADD hub/cpr /channels/hub/cpr
+ADD hub/img2spec /channels/hub/img2spec
+ADD hub/json /channels/hub/json
+ADD hub/src /channels/hub/src
+ADD hub/CMakeLists.txt /channels/hub
+ADD proto /channels/proto
+RUN mkdir /build
+WORKDIR /build
+RUN cmake -S /channels/hub -B /build
+RUN make
+WORKDIR /channels/hub/bin
+ENTRYPOINT ["/channels/hub/bin/channel_hub"]

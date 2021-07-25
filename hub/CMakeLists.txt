@@ -25,11 +25,6 @@ add_custom_target(create_cache_folder ALL
 
 if(WIN32)
 
-add_custom_target(copy_sdl ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_CURRENT_SOURCE_DIR}/sdl"
-    "${CMAKE_CURRENT_SOURCE_DIR}/bin")
-
 add_dependencies(channel_hub copy_sdl)
 
 target_link_libraries(channel_hub legacy_stdio_definitions.lib)
@@ -49,22 +44,17 @@ find_package(OpenSSL REQUIRED)
 add_subdirectory(cpr)
 
 include_directories(${OPENSSL_INCLUDE_DIR})
-target_link_libraries(channel_hub ${OPENSSL_LIBRARIES} cpr::cpr)
 
 set_target_properties(channel_hub
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin"
 )
 
-find_package(OpenGL REQUIRED)
-find_package(SDL2 REQUIRED PATHS "${CMAKE_CURRENT_SOURCE_DIR}/../../SDL2")
+include_directories(img2spec/include)
+SET(IMG2SPEC_BUILD_EXE OFF CACHE BOOL "Do not build executable of img2spec")
+SET(IMG2SPEC_BUILD_STATIC ON CACHE BOOL "Build static library of img2spec")
 
 add_subdirectory(img2spec)
 
-set_target_properties(img2spec
-    PROPERTIES
-    CMAKE_EXE_LINKER_FLAGS "-static"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin"
-)
-
-add_dependencies(channel_hub img2spec copy_configurations create_cache_folder)
+add_dependencies(channel_hub img2spec_static copy_configurations create_cache_folder)
+target_link_libraries(channel_hub ${OPENSSL_LIBRARIES} cpr::cpr img2spec_static)

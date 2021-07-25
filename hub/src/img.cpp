@@ -1,65 +1,68 @@
 
 #include "img.h"
 #include "hub.h"
+#include <img2spec.h>
 
 #include <fstream>
 #include <iostream>
 
 ImageProcessing::ImageProcessing()
 {
+    m_color_zx = img2spec_allocate_device(0);
+    m_grayscale_zx = img2spec_allocate_device(0);
+
+    if (img2spec_load_workspace("color_zx.isw", m_color_zx))
     {
-        std::cout << "Loading color_zx.isw..." << std::endl;
-        std::ifstream f("color_zx.isw", std::ios_base::in);
-        m_color_zx = nlohmann::json::parse(std::string((std::istreambuf_iterator<char>(f)),
-            std::istreambuf_iterator<char>()));
+        std::cerr << "cannot load color_zx workspace" << std::endl;
+        exit(1);
     }
+
+    if (img2spec_load_workspace("grayscale_zx.isw", m_grayscale_zx))
     {
-        std::cout << "Loading grayscale_zx.isw..." << std::endl;
-        std::ifstream f("grayscale_zx.isw", std::ios_base::in);
-        m_grayscale_zx = nlohmann::json::parse(std::string((std::istreambuf_iterator<char>(f)),
-            std::istreambuf_iterator<char>()));
+        std::cerr << "cannot load grayscale_zx workspace" << std::endl;
+        exit(1);
     }
 }
 
-
-std::string ImageProcessing::generate_config(ImageEncoding encoding, float image_scale, bool linear_order,
-    uint16_t target_w, uint16_t target_h)
+ImageProcessing::~ImageProcessing()
 {
-    std::string config_name = std::string(std::tmpnam(nullptr)) + ".json";
+    img2spec_free_device(m_color_zx);
+    img2spec_free_device(m_grayscale_zx);
 
+    m_color_zx = nullptr;
+    m_grayscale_zx = nullptr;
+}
+
+Device* ImageProcessing::obtain_encoding_device(ImageEncoding encoding,
+    float image_scale, bool linear_order, uint16_t target_w, uint16_t target_h)
+{
     image_scale = (float)(int)(image_scale * 1000.0f) / 1000.0f;
 
     switch (encoding)
     {
         case ImageEncoding::color_zx:
         {
-            std::ofstream f(config_name, std::ios_base::out | std::ios_base::binary);
-            m_color_zx["Stack"]["Item[0]"]["mScale"] = image_scale;
-            m_color_zx["Device"]["mOptScreenOrder"] = linear_order ? 0 : 1;
-            m_color_zx["Device"]["mOptWidthCells"] = target_w;
-            m_color_zx["Device"]["mOptHeightCells"] = target_h;
+            img2spec_zx_spectrum_set_screen_order(m_color_zx, linear_order ? 0 : 1);
+            img2spec_zx_spectrum_set_screen_size(m_color_zx, target_w, target_h);
+            img2spec_set_scale(m_color_zx, image_scale);
 
-            std::string str = m_color_zx.dump();
-            f.write((char*)str.data(), str.size());
-            break;
+            return m_color_zx;
         }
         case ImageEncoding::grayscale_zx:
         {
-            std::ofstream f(config_name, std::ios_base::out | std::ios_base::binary);
-            m_grayscale_zx["Stack"]["Item[0]"]["mScale"] = image_scale;
-            m_grayscale_zx["Device"]["mOptScreenOrder"] = linear_order ? 0 : 1;
-            m_grayscale_zx["Device"]["mOptWidthCells"] = target_w;
-            m_grayscale_zx["Device"]["mOptHeightCells"] = target_h;
+            img2spec_zx_spectrum_set_screen_order(m_grayscale_zx, linear_order ? 0 : 1);
+            img2spec_zx_spectrum_set_screen_size(m_grayscale_zx, target_w, target_h);
+            img2spec_set_scale(m_grayscale_zx, image_scale);
 
-            std::string str = m_grayscale_zx.dump();
-            f.write((char*)str.data(), str.size());
-            break;
+            return m_grayscale_zx;
         }
         default:
-            return "";
+        {
+            return nullptr;
+        }
     }
 
-    return config_name;
+    return nullptr;
 }
 
 GetImageResult ImageProcessing::reencode_image(const std::string& source_file,
@@ -125,33 +128,29 @@ GetImageResult ImageProcessing::reencode_image(const std::string& source_file,
 
     bool linear_order = target_w < 256;
 
-    std::string img_config = generate_config(encoding, scale, linear_order, target_w / 8, target_h / 8);
-    std::string result_file = std::string(std::tmpnam(nullptr));
-
-    std::string command =
-#ifndef WIN32
-        "./"
-#endif
-        "img2spec \"" + source_file + "\" \"" + img_config + "\" -s \"" + result_file + "\"";
-    if (system(command.c_str()))
+    Device* encoding_device = obtain_encoding_device(encoding, scale, linear_order, target_w / 8, target_h / 8);
+    if (encoding_device == nullptr)
     {
-        std::cerr << "Failed to execute: " << command << std::endl;
+        std::cerr << "Cannot obtain encoding device" << std::endl;
+        return GetImageResult(CallbackStatus::unknown_resource);
+    }
+
+    if (img2spec_load_image(source_file.c_str(), encoding_device))
+    {
+        std::cerr << "Cannot load image" << std::endl;
         return GetImageResult(CallbackStatus::failed);
     }
-    else
-    {
-        if (ChannelHub::IsVerbose())
-        {
-            std::cout << "Executed: " << command << std::endl;
-        }
-    }
+
+    img2spec_process_image(encoding_device);
 
     std::unique_ptr<std::vector<uint8_t>> v(new std::vector<uint8_t>());
 
+    img2spec_generate_result(encoding_device, [&v](unsigned char *source, uint32_t len) -> void
     {
-        std::ifstream instream(result_file, std::ios::in | std::ios::binary);
-        v->assign((std::istreambuf_iterator<char>(instream)), std::istreambuf_iterator<char>());
-    }
+        uint32_t old_size = v->size();
+        v->resize(old_size + len);
+        std::copy(source, source + len, v->begin() + old_size);
+    });
 
     uint16_t target_pixels = (target_w / 8) * (target_h / 8) * 8;
     uint16_t target_bytes = target_pixels + (target_w / 8) * (target_h / 8);
@@ -163,6 +162,7 @@ GetImageResult ImageProcessing::reencode_image(const std::string& source_file,
         {
             if (v->size() != target_bytes)
             {
+                std::cerr << "Misaligned result" << std::endl;
                 return GetImageResult(CallbackStatus::failed);
             }
 

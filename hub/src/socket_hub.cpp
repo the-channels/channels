@@ -355,10 +355,10 @@ const char* SocketChannelHub::proto_process_cb(int socket, struct proto_process_
 
     if (!send_back.empty())
     {
-        std::cout << "Responding with " << send_back.size() << " object(s):" << std::endl;
 
         if (IsVerbose())
         {
+            std::cout << "Responding with " << send_back.size() << " object(s):" << std::endl;
             uint8_t i = 0;
 
             for (ChannelObject* o: send_back)
@@ -378,6 +378,10 @@ const char* SocketChannelHub::proto_process_cb(int socket, struct proto_process_
                     pps++;
                 }
             }
+        }
+        else
+        {
+            std::cout << "Responding with " << send_back.size() << " object(s)" << std::endl;
         }
 
         channels_proto_send(socket, send_back.data(), send_back.size(), proto->request_id);

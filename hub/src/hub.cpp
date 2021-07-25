@@ -94,22 +94,26 @@ GetImageResult ChannelHub::get_image(const ChannelId &channel, const BoardId &bo
 
     if (attachment.empty())
     {
+        std::cerr << "empty attachment" << std::endl;
         return GetImageResult(CallbackStatus::unknown_resource);
     }
 
     if (target_w > w)
     {
+        std::cerr << "wrong target_w" << std::endl;
         return GetImageResult(CallbackStatus::failed);
     }
 
     if (target_h > h)
     {
+        std::cerr << "wrong target_h" << std::endl;
         return GetImageResult(CallbackStatus::failed);
     }
 
     const ChannelPtr& ch = get_channel(channel);
     if (ch == nullptr)
     {
+        std::cerr << "Cannot obtain channel" << std::endl;
         return GetImageResult(CallbackStatus::unknown_resource);
     }
 
@@ -118,6 +122,7 @@ GetImageResult ChannelHub::get_image(const ChannelId &channel, const BoardId &bo
     auto result = ch->get_attachment(board, thread, post, attachment, w, h, fname);
     if (result != CallbackStatus::ok)
     {
+        std::cerr << "Cannot fetch attachment" << std::endl;
         return GetImageResult(result);
     }
 
