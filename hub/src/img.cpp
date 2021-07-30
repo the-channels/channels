@@ -78,7 +78,8 @@ GetImageResult ImageProcessing::reencode_image(const std::string& source_file,
         auto ff = m_image_cache.find(cc);
         if (ff != m_image_cache.end())
         {
-            return GetImageResult(CallbackStatus::ok, ff->second.data.get(), ff->second.w, ff->second.h);
+            return GetImageResult(CallbackStatus::ok, ff->second.data.get(),
+                ff->second.data_size, ff->second.w, ff->second.h);
         }
     }
 
@@ -126,7 +127,7 @@ GetImageResult ImageProcessing::reencode_image(const std::string& source_file,
 
     float scale = std::min(scalew, scaleh);
 
-    bool linear_order = target_w < 256;
+    bool linear_order = target_w < 256 || target_h < 192;
 
     Device* encoding_device = obtain_encoding_device(encoding, scale, linear_order, target_w / 8, target_h / 8);
     if (encoding_device == nullptr)
@@ -170,11 +171,14 @@ GetImageResult ImageProcessing::reencode_image(const std::string& source_file,
             {
                 // remove color
                 v->resize(target_pixels);
+                target_bytes = target_pixels;
             }
 
             break;
         }
     }
+
+    std::cout << "Reencoded image " << target_w << "x" << target_h << " into " << target_bytes << " bytes" << std::endl;
 
     {
         std::lock_guard<std::mutex> guard(m_image_cache_mutex);
@@ -183,7 +187,8 @@ GetImageResult ImageProcessing::reencode_image(const std::string& source_file,
         cache.w = target_w;
         cache.h = target_h;
         cache.data = std::move(v);
+        cache.data_size = target_bytes;
 
-        return GetImageResult(CallbackStatus::ok, cache.data.get(), cache.w, cache.h);
+        return GetImageResult(CallbackStatus::ok, cache.data.get(), cache.data_size, cache.w, cache.h);
     }
 }

@@ -3,6 +3,7 @@
 #include "scenes.h"
 #include "system.h"
 #include "netlog.h"
+#include "heap.h"
 
 #include "channels_proto.h"
 #include "channels.h"
@@ -10,11 +11,11 @@
 static struct gui_scene_t scene;
 static struct gui_form_t selection;
 static struct gui_select_t channel;
-static const char* selected_channel = NULL;
+static char selected_channel[64];
 
 static void channel_selected(struct gui_select_t* this, struct gui_select_option_t* selected)
 {
-    selected_channel = selected->value;
+    strcpy(selected_channel, selected->value);
 }
 
 static void proceed_with_selection(struct gui_button_t* this)
@@ -50,6 +51,11 @@ static void process_channel(ChannelObject* object)
     if (prop)
     {
         zxgui_select_add_option(&channel, prop->value, prop->value_size, 0);
+
+        if (channel.first == channel.last)
+        {
+            channel_selected(&channel, channel.first);
+        }
     }
 }
 
@@ -66,6 +72,11 @@ static void get_channels_error(const char* error)
 
 void switch_select_channel()
 {
+    reset_heap();
+
+    channel.first = NULL;
+    channel.last = NULL;
+
     declare_str_property_on_stack(key, OBJ_PROPERTY_ID, "channels", NULL);
     declare_object_on_stack(request, 128, &key);
 

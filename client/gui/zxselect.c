@@ -70,6 +70,11 @@ static void select_render(uint8_t x, uint8_t y, struct gui_select_t* this, struc
             zxgui_screen_color(color);
             zxgui_screen_clear(x, y, this->w - 1, hh);
 
+            font_state.paper.x = x * 8;
+            font_state.paper.y = y * 8;
+            font_state.paper.width = (this->w - 1) * 8;
+            font_state.paper.height = (this->h - 1) * 8;
+
             offset = 0;
 
             o = page;
@@ -99,7 +104,7 @@ static void select_render(uint8_t x, uint8_t y, struct gui_select_t* this, struc
                     zxgui_screen_put(x + this->w - 2, y + offset, GUI_ICON_MORE_TO_FOLLOW);
                 }
 
-                fzx_at(&font_state, x * 8 + 9, (y + offset) * 8 + 1);
+                fzx_at(&font_state, 9, offset * 8 + 1);
                 fzx_puts(&font_state, (char *) o->value);
 
                 offset++;
@@ -110,6 +115,8 @@ static void select_render(uint8_t x, uint8_t y, struct gui_select_t* this, struc
                 }
                 o = o->next;
             }
+
+            zxgui_reset_paper();
         }
 
         if (flags & GUI_FLAG_DIRTY_INTERNAL)
@@ -254,7 +261,6 @@ uint8_t* zxgui_select_add_option(struct gui_select_t* select, const char* option
     {
         select->first = o;
         select->selection = o;
-        select->selected(select, o);
     }
 
     o->prev = select->last;

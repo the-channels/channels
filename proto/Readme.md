@@ -239,4 +239,4 @@ Supported schemes:
 Following that object, an unspecified amount of objects with raw image data SHOULD follow.
 Each data object SHOULD have `OBJ_PROPERTY_PAYLOAD` property with chunk's payload.
 A total combined payload sizes of these objects SHOULD match the image raw data size as advertised in `s` property.
-Each chunk's payload size SHOULD NOT be greater than 512.
+Each chunk's payload size SHOULD NOT be greater than 1024.

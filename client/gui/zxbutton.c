@@ -11,6 +11,11 @@ static void button_render(uint8_t x, uint8_t y, struct gui_button_t* this, struc
     x += this->x;
     y += this->y;
 
+    if (this->flags & GUI_FLAG_HIDDEN)
+    {
+        return;
+    }
+
     if (is_object_invalidated(this))
     {
         zxgui_screen_color(INK_WHITE | BRIGHT | PAPER_BLACK);

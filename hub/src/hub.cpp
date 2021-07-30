@@ -5,17 +5,45 @@
 #include <iostream>
 #include <cstdlib>
 #include "board.h"
-#include "channels/four_chan.h"
+#include "python_channel.h"
 
 ChannelHub* ChannelHub::s_hub = nullptr;
 bool ChannelHub::s_verbose = false;
 
 ChannelHub::ChannelHub() :
-    m_image_processing()
+    m_image_processing(),
+    m_python()
 {
     s_hub = this;
 
-    m_channels.emplace("4chan", new FourChan());
+    py::module_ channels_module = py::module_::import("channels.base");
+
+    channels_module.attr("import_modules")(py::cpp_function([this](std::string name, std::string description, py::object clazz)
+    {
+        std::cout << "Registering channel: " << name << std::endl;
+        register_channel(name, new PythonChannel(name, description, clazz));
+    }));
+}
+
+void ChannelHub::register_channel(const ChannelId& channel_id, Channel* ptr)
+{
+    m_channels.emplace(channel_id, ptr);
+}
+
+void ChannelHub::new_client(int client)
+{
+    for (auto& entry: m_channels)
+    {
+        entry.second->new_client(client);
+    }
+}
+
+void ChannelHub::client_released(int client)
+{
+    for (auto& entry: m_channels)
+    {
+        entry.second->client_released(client);
+    }
 }
 
 const ChannelPtr& ChannelHub::get_channel(const ChannelId& channel) const
@@ -31,7 +59,7 @@ const ChannelPtr& ChannelHub::get_channel(const ChannelId& channel) const
     return it->second;
 }
 
-GetBoardsResult ChannelHub::get_boards(const ChannelId &channel, uint32_t limit)
+GetBoardsResult ChannelHub::get_boards(int client, const ChannelId &channel, uint32_t limit)
 {
     const ChannelPtr& ch = get_channel(channel);
     if (ch == nullptr)
@@ -39,10 +67,10 @@ GetBoardsResult ChannelHub::get_boards(const ChannelId &channel, uint32_t limit)
         return GetBoardsResult(CallbackStatus::unknown_resource, std::vector<class Board>());
     }
 
-    return ch->get_boards(limit);
+    return ch->get_boards(client, limit);
 }
 
-GetImageResult ChannelHub::get_image(const ChannelId &channel, const BoardId &board,
+GetImageResult ChannelHub::get_image(int client, const ChannelId &channel, const BoardId &board,
     const ThreadId& thread, const PostId &post, uint32_t target_w, uint32_t target_h,
     ImageProcessing::ImageEncoding encoding)
 {
@@ -53,7 +81,7 @@ GetImageResult ChannelHub::get_image(const ChannelId &channel, const BoardId &bo
     {
         std::lock_guard<std::mutex> cache_guard(m_catalog_cache_mutex);
 
-        auto cached_catalog_thread = m_catalog_cache.find({channel, board});
+        auto cached_catalog_thread = m_catalog_cache.find({client, channel, board});
         if (cached_catalog_thread != m_catalog_cache.end())
         {
             auto& cached_catalog = cached_catalog_thread->second;
@@ -74,7 +102,7 @@ GetImageResult ChannelHub::get_image(const ChannelId &channel, const BoardId &bo
     if (!attachment.empty())
     {
         std::lock_guard<std::mutex> cache_guard(m_thread_cache_mutex);
-        auto cached_thread = m_thread_cache.find({channel, board, thread});
+        auto cached_thread = m_thread_cache.find({client, channel, board, thread});
         if (cached_thread != m_thread_cache.end())
         {
             auto& posts = cached_thread->second;
@@ -119,7 +147,7 @@ GetImageResult ChannelHub::get_image(const ChannelId &channel, const BoardId &bo
 
     std::string fname;
 
-    auto result = ch->get_attachment(board, thread, post, attachment, w, h, fname);
+    auto result = ch->get_attachment(client, board, thread, post, attachment, w, h, fname);
     if (result != CallbackStatus::ok)
     {
         std::cerr << "Cannot fetch attachment" << std::endl;
@@ -129,12 +157,13 @@ GetImageResult ChannelHub::get_image(const ChannelId &channel, const BoardId &bo
     return m_image_processing.reencode_image(fname, w, h, target_w, target_h, encoding);
 }
 
-GetThreadsResult ChannelHub::get_threads(const ChannelId &channel, const BoardId &board,
+GetThreadsResult ChannelHub::get_threads(
+    int client, const ChannelId &channel, const BoardId &board,
     bool flush, uint32_t offset, uint32_t limit)
 {
     {
         std::lock_guard<std::mutex> cache_guard(m_catalog_cache_mutex);
-        auto cached_catalog = m_catalog_cache.find({channel, board});
+        auto cached_catalog = m_catalog_cache.find({client, channel, board});
 
         if (!flush && cached_catalog != m_catalog_cache.end())
         {
@@ -152,13 +181,13 @@ GetThreadsResult ChannelHub::get_threads(const ChannelId &channel, const BoardId
         return GetThreadsResult(CallbackStatus::unknown_resource, std::vector<class Thread>(), 0);
     }
 
-    auto res = ch->get_threads(board);
+    auto res = ch->get_threads(client, board);
 
     if (res.status == CallbackStatus::ok)
     {
         {
             std::lock_guard<std::mutex> cache_guard(m_catalog_cache_mutex);
-            m_catalog_cache[{channel, board}] = res.threads;
+            m_catalog_cache[{client, channel, board}] = res.threads;
         }
 
         std::vector<class Thread> result;
@@ -175,12 +204,13 @@ GetThreadsResult ChannelHub::get_threads(const ChannelId &channel, const BoardId
     }
 }
 
-GetThreadResult ChannelHub::get_thread(const ChannelId &channel, const BoardId &board, const ThreadId &thread,
+GetThreadResult ChannelHub::get_thread(
+    int client, const ChannelId &channel, const BoardId &board, const ThreadId &thread,
     bool flush, uint32_t offset, uint32_t limit)
 {
     {
         std::lock_guard<std::mutex> cache_guard(m_thread_cache_mutex);
-        auto cached_thread = m_thread_cache.find({channel, board, thread});
+        auto cached_thread = m_thread_cache.find({client, channel, board, thread});
         if (!flush && cached_thread != m_thread_cache.end())
         {
             auto& posts = cached_thread->second;
@@ -200,13 +230,13 @@ GetThreadResult ChannelHub::get_thread(const ChannelId &channel, const BoardId &
         return GetThreadResult(CallbackStatus::unknown_resource, std::vector<class Post>(), 0);
     }
 
-    auto res = ch->get_thread(board, thread);
+    auto res = ch->get_thread(client, board, thread);
 
     if (res.status == CallbackStatus::ok)
     {
         {
             std::lock_guard<std::mutex> cache_guard(m_thread_cache_mutex);
-            m_thread_cache[{channel, board, thread}] = res.posts;
+            m_thread_cache[{client, channel, board, thread}] = res.posts;
         }
 
         std::vector<class Post> result;

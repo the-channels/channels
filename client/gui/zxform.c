@@ -27,12 +27,6 @@ static void form_render(uint8_t x, uint8_t y, struct gui_form_t* this, struct gu
 
         switch(this->style)
         {
-            case FORM_STYLE_DEFAULT:
-            {
-                c = GUI_FORM_LEFT_BOTTOM_CORNER;
-                f = INK_WHITE | PAPER_BLACK;
-                break;
-            }
             case FORM_STYLE_FRAME:
             {
                 c = GUI_SELECT_LEFT_BOTTOM_CORNER;
@@ -40,9 +34,19 @@ static void form_render(uint8_t x, uint8_t y, struct gui_form_t* this, struct gu
 
                 break;
             }
+            case FORM_STYLE_DEFAULT:
+            default:
+            {
+                c = GUI_FORM_LEFT_BOTTOM_CORNER;
+                f = INK_WHITE | PAPER_BLACK;
+                break;
+            }
         }
 
-        zxgui_rectangle(INK_CYAN | BRIGHT | PAPER_BLACK, x, y, this->w, this->h, c);
+        if (this->style != FORM_STYLE_EMPTY)
+        {
+            zxgui_rectangle(INK_CYAN | BRIGHT | PAPER_BLACK, x, y, this->w, this->h, c);
+        }
 
         zxgui_screen_color(f);
         zxgui_screen_clear(x + 1, y + 1, this->w - 1, 1);

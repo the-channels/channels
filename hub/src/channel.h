@@ -16,12 +16,14 @@ typedef std::unique_ptr<class Channel> ChannelPtr;
 class Channel
 {
 public:
-    virtual CallbackStatus get_attachment(const BoardId &board, const ThreadId &thread, const PostId &post,
+    virtual CallbackStatus get_attachment(int client, const BoardId &board, const ThreadId &thread, const PostId &post,
         const std::string& attachment, uint32_t width, uint32_t height,
         std::string& fout) = 0;
-    virtual GetBoardsResult get_boards(uint32_t limit) = 0;
-    virtual GetThreadsResult get_threads(const BoardId &board) = 0;
-    virtual GetThreadResult get_thread(const BoardId &board, const ThreadId &thread) = 0;
+    virtual GetBoardsResult get_boards(int client, uint32_t limit) = 0;
+    virtual GetThreadsResult get_threads(int client, const BoardId &board) = 0;
+    virtual GetThreadResult get_thread(int client, const BoardId &board, const ThreadId &thread) = 0;
+    virtual void new_client(int client) {}
+    virtual void client_released(int client) {}
 
     const std::string& get_name() const { return m_name; }
     const std::string& get_title() const { return m_title; }
@@ -29,8 +31,8 @@ public:
 
     ChannelObject* write() const;
 protected:
-    explicit Channel(std::string&& name, std::string&& title) :
-        m_name(std::move(name)), m_title(std::move(title)) {}
+    explicit Channel(const std::string& name, const std::string& title) :
+        m_name(name), m_title(title) {}
 
     std::string preprocess_html(const std::string& source);
 

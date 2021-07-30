@@ -8,7 +8,17 @@ static void icon_render(uint8_t x, uint8_t y, struct gui_animated_icon_t* this, 
     x += this->x;
     y += this->y;
 
-    if (++this->time)
+    if (this->flags & GUI_FLAG_HIDDEN)
+    {
+        if (is_object_invalidated(this))
+        {
+            zxgui_screen_clear(x, y, this->w, this->h);
+        }
+
+        return;
+    }
+
+    if (is_object_invalidated(this) || this->time++ < this->speed)
     {
         return;
     }
@@ -25,7 +35,7 @@ static void icon_render(uint8_t x, uint8_t y, struct gui_animated_icon_t* this, 
 }
 
 void zxgui_animated_icon_init(struct gui_animated_icon_t* icon, uint8_t x, uint8_t y, uint8_t w, uint8_t h,
-    uint8_t frames, uint8_t color, const uint8_t* source)
+    uint8_t frames, uint8_t color, const uint8_t* source, uint8_t speed)
 {
     icon->render = (gui_render_f)icon_render;
     icon->event = NULL;
@@ -39,5 +49,6 @@ void zxgui_animated_icon_init(struct gui_animated_icon_t* icon, uint8_t x, uint8
     icon->frames = frames;
     icon->current_frame = 0;
     icon->time = 0;
+    icon->speed = speed;
     icon->source = source;
 }

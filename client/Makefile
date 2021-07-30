@@ -28,7 +28,7 @@ endif
 SOURCES := $(wildcard src/*.c gui/*.c netlog/*.c ../proto/channels_proto.c ../proto/proto_objects.c)
 OBJECTS = $(SOURCES:.c=.o)
 
-all: bin/channels.tap
+all: channels
 
 libs:
 	@mkdir -p libs
@@ -56,6 +56,7 @@ bin/channels__.bin: spectranet-libraries bin $(OBJECTS)
 bin:
 	@mkdir -p bin
 
+channels: channels-bin
 channels-bin: bin/channels__.bin
 
 boot-zx: channels-bin

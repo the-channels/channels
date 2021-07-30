@@ -30,11 +30,24 @@ A special proxy called Hub (`hub/` folder) is supposed to be run somewhere on yo
 * The proxy implements a set of Channels (like a channel for 4chan) and facilitates external calls to provide a standartized API for each channel
 * The client doesn't even care what channels are, as long as they use the same API, so potential of having the client to browse pretty much anything is limitless, as long as you have boards (or categories, you can just have one) and a set of conversations (threads) with each thread having posts.
 
+### How channels work?
+
+Despite being written in C++, the Hub uses Python to convert channel specifics into
+a standardized form.
+
+![channels](https://user-images.githubusercontent.com/1666014/127716547-670110c4-4c16-47a9-8a72-954963ec54fc.png)
+
+Logic blocks marked here in green are Python packages.
+The hub simply scans installed packages that match and loads them up.
+
+Some packaged are distributed with the hub, but other could be insalled into the sytem,
+and the Hub would detect it. To read on how to write a new channel, refer to [Creating A New Channel](NewChannel.md).
+
 ## Channels Proto
 A client and the hub communicate via a special protocol, as described in [this document](./proto/Readme.md).
 
 ## How to build from source
-* The Hub is simply compiled using CMake. The only dependency is openssl.
+* The Hub is simply compiled using CMake. 
 * Take care to fetch all submodules.
 * The Client uses Makefiles and can only be compiled using [z88dk](https://github.com/z88dk/z88dk)
 * You'd need UNIX to compile the client, so for Windows, you would need to use WSL

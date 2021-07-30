@@ -11,3 +11,7 @@
 *_np.asm
 *.lib
 deployment.xml
+/hub/cmake-build-release
+/hub/channels/build/
+/hub/channels/*.egg-info
+/hub/channels/dist

@@ -37,15 +37,16 @@ typedef struct GetThreadResult {
 
 
 typedef struct GetImageResult {
-    GetImageResult(CallbackStatus s, const std::vector<uint8_t>* data, uint32_t w, uint32_t h) :
-        status(s), data(data), w(w), h(h) {}
+    GetImageResult(CallbackStatus s, const std::vector<uint8_t>* data, uint16_t data_size, uint32_t w, uint32_t h) :
+        status(s), data(data), data_size(data_size), w(w), h(h) {}
     GetImageResult(CallbackStatus s) :
-        status(s), data(nullptr), w(0), h(0) {}
+        status(s), data(nullptr), data_size(0), w(0), h(0) {}
 
     CallbackStatus status;
     const std::vector<uint8_t>* data;
     uint16_t w;
     uint16_t h;
+    uint16_t data_size;
 } GetImageResult;
 
 #endif

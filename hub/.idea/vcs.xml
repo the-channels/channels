@@ -3,8 +3,6 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$/.." vcs="Git" />
     <mapping directory="$PROJECT_DIR$/cmake-build-release/_deps/zlib-src" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/cpr" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/img2spec" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/json" vcs="Git" />
   </component>
 </project>

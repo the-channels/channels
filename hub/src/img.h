@@ -4,7 +4,7 @@
 #include <string>
 #include <thread>
 #include <mutex>
-#include <json.hpp>
+#include <map>
 #include "callbacks.h"
 
 struct ClientCache;
@@ -13,6 +13,7 @@ using Cache = std::map<std::string, ClientCache>;
 struct CachedImage
 {
     std::unique_ptr<std::vector<uint8_t>> data;
+    uint32_t data_size;
     uint32_t w;
     uint32_t h;
 };

@@ -24,7 +24,7 @@ static void label_render(uint8_t x, uint8_t y, struct gui_label_t* this, struct 
         {
             char* c = (char*)this->title;
             const char* end = c + strlen(c);
-            uint8_t offset_x = x * 8;
+            uint8_t offset_x = x * 8 + 1;
             uint8_t offset_y = y * 8 + 1;
             uint8_t max_offset_y = offset_y + this->h * 8;
             uint8_t new_line = 1;

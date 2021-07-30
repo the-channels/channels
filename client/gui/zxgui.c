@@ -5,7 +5,9 @@ typedef uint8_t uchar;
 
 #include <stdint.h>
 #include <font/fzx.h>
+#include <string.h>
 #include "system.h"
+#include "zxgui_tiles.h"
 
 struct fzx_state font_state;
 struct r_Rect16 screen = { 0, 256, 0, 192 };
@@ -67,6 +69,20 @@ void zxgui_image(uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* sour
     }
 }
 
+void zxgui_line(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t c)
+{
+    uint8_t* data = get_gui_tiles() + c * 8;
+    uint8_t* addr = zx_cxy2saddr(x, y);
+
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        memset(addr, *data++, w);
+        addr += 256;
+    }
+
+    memset(zx_cxy2aaddr(x, y), form_color, w);
+}
+
 void zxgui_rectangle(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t c)
 {
     zxgui_screen_color(form_color);
@@ -83,16 +99,11 @@ void zxgui_rectangle(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_
     uint8_t left = c++;
     uint8_t bottom = c++;
     uint8_t right = c;
-    uint8_t i = x + 1;
 
-    while (i < xw)
-    {
-        zxgui_screen_put(i, y, top);
-        zxgui_screen_put(i, yh, bottom);
-        i++;
-    }
+    zxgui_line(form_color, x + 1, y, w - 1, top);
+    zxgui_line(form_color, x + 1, yh, w - 1, bottom);
 
-    i = y + 1;
+    uint8_t i = y + 1;
 
     while (i < yh)
     {

@@ -1,11 +1,11 @@
 FROM alpine:3
-RUN apk update && apk add --no-cache cmake git build-base openssl openssl-libs-static openssl-dev
+RUN apk update && apk add --no-cache cmake git build-base python3 python3-dev py3-setuptools
 
 RUN mkdir /channels && mkdir /channels/hub/ && mkdir /channels/hub/bin && mkdir /channels/hub/bin/cache
 ADD hub/configurations /channels/hub/configurations
-ADD hub/cpr /channels/hub/cpr
+ADD hub/pybind11 /channels/hub/pybind11
+ADD hub/channels /channels/hub/channels
 ADD hub/img2spec /channels/hub/img2spec
-ADD hub/json /channels/hub/json
 ADD hub/src /channels/hub/src
 ADD hub/CMakeLists.txt /channels/hub
 ADD proto /channels/proto

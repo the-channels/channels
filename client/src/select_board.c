@@ -3,6 +3,7 @@
 #include "scenes.h"
 #include "system.h"
 #include "netlog.h"
+#include "heap.h"
 #include <stdlib.h>
 
 #include "channels_proto.h"
@@ -13,23 +14,21 @@ static struct gui_form_t description_form;
 static struct gui_select_t board;
 static struct gui_label_t title;
 static struct gui_label_t description;
-
-static const char* selected_board = NULL;
+static char selected_board[64];
 static char label_title[48];
 
-static void channel_selected(struct gui_select_t* this, struct gui_select_option_t* selected)
+struct channel_board_info
 {
-    selected_board = selected->value;
+    char* id;
+    char* description;
+};
 
-    if (selected->user)
-    {
-        description.title = selected->user;
-        object_invalidate(&description, GUI_FLAG_DIRTY);
-    }
-    else
-    {
-        description.title = "";
-    }
+static void board_selected(struct gui_select_t* this, struct gui_select_option_t* selected)
+{
+    struct channel_board_info* info = selected->user;
+    description.title = info->description;
+    object_invalidate(&description, GUI_FLAG_DIRTY);
+    strcpy(selected_board, info->id ? info->id : selected->value);
 }
 
 static void proceed_with_selection(struct gui_button_t* this)
@@ -53,7 +52,7 @@ void init_select_board()
     }
 
     {
-        zxgui_select_init(&board, 0, 1, 13, 21, channel_selected);
+        zxgui_select_init(&board, 0, 1, 13, 21, board_selected);
         zxgui_scene_add(&scene, &board);
     }
 
@@ -61,7 +60,7 @@ void init_select_board()
         zxgui_form_init(&description_form, 14, 1, 17, 21, "Description", FORM_STYLE_FRAME);
         zxgui_scene_add(&scene, &description_form);
 
-        zxgui_label_init(&description, 1, 1, 14, 17, "", INK_WHITE | PAPER_BLACK, 0);
+        zxgui_label_init(&description, 1, 1, 14, 17, "", INK_WHITE | PAPER_BLACK, GUI_FLAG_MULTILINE);
         zxgui_form_add_child(&description_form, &description);
     }
 
@@ -81,25 +80,48 @@ void init_select_board()
 static void process_board(ChannelObject* object)
 {
     ChannelObjectProperty* prop = find_property(object, OBJ_PROPERTY_ID);
-    if (prop)
+    ChannelObjectProperty* title_ = find_property(object, OBJ_PROPERTY_TITLE);
+    ChannelObjectProperty* description_ = find_property(object, OBJ_PROPERTY_COMMENT);
+
+    if (prop && description_)
     {
-        ChannelObjectProperty* t = find_property(object, OBJ_PROPERTY_TITLE);
-        uint16_t value_size;
-        if (t)
+        uint16_t value_size = sizeof(struct channel_board_info) + description_->value_size + 1;
+        uint8_t* new_data;
+
+        if (title_)
         {
-            value_size = t->value_size + 1;
+            value_size += prop->value_size + 1;
+            new_data = zxgui_select_add_option(&board, title_->value, title_->value_size, value_size);
         }
         else
         {
-            value_size = 0;
+            new_data = zxgui_select_add_option(&board, prop->value, prop->value_size, value_size);
         }
 
-        uint8_t* new_data = zxgui_select_add_option(&board, prop->value, prop->value_size, value_size);
-
-        if (t)
+        struct channel_board_info* board_info = (struct channel_board_info*)new_data;
+        new_data += sizeof(struct channel_board_info);
+        if (title_)
         {
-            memcpy(new_data, t->value, t->value_size);
-            new_data[t->value_size] = 0;
+            board_info->id = (char*)new_data;
+            memcpy(new_data, prop->value, prop->value_size);
+            new_data[prop->value_size] = 0;
+            new_data += prop->value_size + 1;
+        }
+        else
+        {
+            board_info->id = NULL;
+        }
+
+        board_info->description = (char*)new_data;
+
+        {
+            memcpy(board_info->description, description_->value, description_->value_size);
+            board_info->description[description_->value_size] = 0;
+        }
+
+        if (board.last == board.first)
+        {
+            board_selected(&board, board.last);
         }
     }
 }
@@ -118,6 +140,11 @@ static void get_boards_error(const char* error)
 
 void switch_select_board()
 {
+    reset_heap();
+    description.title = "";
+    board.first = NULL;
+    board.last = NULL;
+
     sprintf(label_title, "%s SELECT BOARD", channels_get_channel());
 
     declare_str_property_on_stack(boards_, OBJ_PROPERTY_ID, "boards", NULL);

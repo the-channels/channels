@@ -49,6 +49,9 @@ enum gui_tiles {
     QUESTION_MARK_4,
     GUI_ICON_6,
     GUI_ICON_7,
+    GUI_ICON_LOADING_SMALL_1,
+    GUI_ICON_LOADING_SMALL_2,
+    GUI_SELECTED_ENTRY
 };
 
 enum gui_event_type {
@@ -70,6 +73,7 @@ typedef uint8_t (*gui_event_f)(enum gui_event_type event_type, void* event, stru
 #define GUI_FLAG_DIRTY (0x01u)
 #define GUI_FLAG_DIRTY_INTERNAL (0x02u)
 #define GUI_FLAG_MULTILINE (0x04u)
+#define GUI_FLAG_HIDDEN (0x08u)
 
 #define GUI_OBJECT_BASE gui_render_f render; \
                         gui_event_f event; \
@@ -97,6 +101,7 @@ enum gui_form_style
 {
     FORM_STYLE_DEFAULT = 0,
     FORM_STYLE_FRAME,
+    FORM_STYLE_EMPTY,
 };
 
 struct gui_form_t
@@ -138,6 +143,7 @@ struct gui_animated_icon_t
     uint8_t frames;
     uint8_t current_frame;
     uint8_t time;
+    uint8_t speed;
     const uint8_t* source;
 };
 
@@ -146,6 +152,19 @@ struct gui_image_t
     GUI_OBJECT_BASE;
     const uint8_t* source;
     const uint8_t* colors;
+};
+
+struct gui_dynamic_image_t;
+
+typedef const uint8_t* (*gui_label_obtain_image_f)(struct gui_dynamic_image_t* this, uint16_t* data_size);
+typedef void (*gui_label_release_image_f)(struct gui_dynamic_image_t* this);
+
+struct gui_dynamic_image_t
+{
+    GUI_OBJECT_BASE;
+    gui_label_obtain_image_f obtain_data;
+    gui_label_release_image_f release_data;
+    void* user;
 };
 
 struct gui_button_t
@@ -208,9 +227,10 @@ extern void zxgui_dynamic_label_init(struct gui_dynamic_label_t* label, uint8_t 
     uint8_t flags, gui_label_obtain_title_data_f obtain_data, gui_label_release_title_data_f release_data, void* user);
 extern uint8_t zxgui_label_text_height(uint8_t w, const char* text, uint16_t len);
 extern void zxgui_animated_icon_init(struct gui_animated_icon_t* icon, uint8_t x, uint8_t y, uint8_t w, uint8_t h,
-    uint8_t frames, uint8_t color, const uint8_t* source);
+    uint8_t frames, uint8_t color, const uint8_t* source, uint8_t speed);
 extern void zxgui_image_init(struct gui_image_t* image, uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* source, const uint8_t* colors);
-
+extern void zxgui_dynamic_image_init(struct gui_dynamic_image_t* image, uint8_t x, uint8_t y, uint8_t w, uint8_t h,
+    gui_label_obtain_image_f obtain_data, gui_label_release_image_f release_data, void* user);
 extern void zxgui_screen_color(uint8_t color) __z88dk_callee;
 extern void zxgui_screen_put(uint8_t x, uint8_t y, uint8_t ch) __z88dk_callee;
 extern void zxgui_screen_clear(uint8_t x, uint8_t y, uint8_t w, uint8_t h) __z88dk_callee;

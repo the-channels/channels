@@ -66,7 +66,7 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
         }
 
         uint16_t limit = get_uint16_property(channel_object, 'l', 128);
-        auto res = Get()->get_boards(channel, limit);
+        auto res = Get()->get_boards(client, channel, limit);
 
         if (res.first != CallbackStatus::ok)
         {
@@ -107,7 +107,7 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
         uint16_t limit = get_uint16_property(channel_object, 'l', 128);
         uint16_t offset = get_uint16_property(channel_object, 'o', 0);
 
-        auto res = Get()->get_threads(channel, board, flush, offset, limit);
+        auto res = Get()->get_threads(client, channel, board, flush, offset, limit);
 
         if (res.status != CallbackStatus::ok)
         {
@@ -187,7 +187,7 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
             return "Unknown encoding";
         }
 
-        auto res = Get()->get_image(channel, board, thread, post, target_w, target_h, encoding);
+        auto res = Get()->get_image(client, channel, board, thread, post, target_w, target_h, encoding);
 
         if (res.status != CallbackStatus::ok || res.data == nullptr)
         {
@@ -197,19 +197,17 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
         {
             declare_arg_property_on_stack(w_, 'w', res.w, nullptr);
             declare_arg_property_on_stack(h_, 'h', res.h, &w_);
-
-            uint16_t data_size = res.data->size();
-            declare_arg_property_on_stack(data_, 's', data_size, &h_);
+            declare_arg_property_on_stack(data_, 's', res.data_size, &h_);
 
             result.push_back(channel_object_allocate(&data_));
         }
 
         const uint8_t* d = res.data->data();
-        uint32_t l = res.data->size();
+        uint16_t l = res.data_size;
 
         while (l)
         {
-            uint16_t size = l > 512 ? 512 : l;
+            uint16_t size = l > 1024 ? 1024 : l;
             declare_variable_property_on_stack(p, OBJ_PROPERTY_PAYLOAD, d, size, nullptr);
             result.push_back(channel_object_allocate(&p));
 
@@ -252,7 +250,7 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
         uint16_t limit = get_uint16_property(channel_object, 'l', 128);
         uint16_t offset = get_uint16_property(channel_object, 'o', 0);
 
-        auto res = Get()->get_thread(channel, board, thread, flush, offset, limit);
+        auto res = Get()->get_thread(client, channel, board, thread, flush, offset, limit);
 
         if (res.status != CallbackStatus::ok)
         {
@@ -402,6 +400,8 @@ void SocketChannelHub::process_socket(int socket)
 {
     std::cout << "New client connected: " << socket << std::endl;
 
+    new_client(socket);
+
     auto& handlers = m_handlers;
     struct proto_process_t proto = {};
 
@@ -416,6 +416,8 @@ void SocketChannelHub::process_socket(int socket)
     }
 
     std::cout << "Client disconnected: " << socket << std::endl;
+
+    client_released(socket);
 }
 
 void SocketChannelHub::accept()
@@ -453,6 +455,8 @@ int SocketChannelHub::run()
     }
 
     std::cout << "Listening on port: " << m_port << std::endl;
+
+    py::gil_scoped_release guard{};
 
     while (1)
     {

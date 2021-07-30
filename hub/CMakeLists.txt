@@ -24,7 +24,6 @@ add_custom_target(create_cache_folder ALL
     "${CMAKE_CURRENT_SOURCE_DIR}/bin/cache")
 
 if(WIN32)
-
 target_link_libraries(channel_hub legacy_stdio_definitions.lib)
 set(OPENSSL_ROOT_DIR "C:/Program Files/OpenSSL-Win64")
 else()
@@ -34,25 +33,30 @@ endif()
 set(OPENSSL_USE_STATIC_LIBS TRUE)
 set(CURLPP_BUILD_SHARED_LIBS OFF CACHE BOOL "No shareds thanks")
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "No shareds thanks")
-set(CPR_BUILD_TESTS OFF CACHE BOOL "No tests thanks")
-set(CPR_ENABLE_SSL ON CACHE BOOL "SSL Please")
 set(CURL_DISABLE_TESTS TRUE)
-find_package(OpenSSL REQUIRED)
 
-add_subdirectory(cpr)
-
-include_directories(${OPENSSL_INCLUDE_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 
 set_target_properties(channel_hub
     PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin"
-)
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 
 include_directories(img2spec/include)
 SET(IMG2SPEC_BUILD_EXE OFF CACHE BOOL "Do not build executable of img2spec")
 SET(IMG2SPEC_BUILD_STATIC ON CACHE BOOL "Build static library of img2spec")
 
 add_subdirectory(img2spec)
+add_subdirectory(pybind11)
 
-add_dependencies(channel_hub img2spec_static copy_configurations create_cache_folder)
-target_link_libraries(channel_hub ${OPENSSL_LIBRARIES} cpr::cpr img2spec_static)
+find_package(Python3 REQUIRED)
+
+add_custom_target(
+    channel_packages
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/channels/setup.py install
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/channels
+    COMMENT "Installing channels"
+)
+
+add_dependencies(channel_hub img2spec_static copy_configurations create_cache_folder channel_packages)
+
+target_link_libraries(channel_hub img2spec_static pybind11::embed)
