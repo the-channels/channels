@@ -2,17 +2,30 @@ from channels.base import Channel, ChannelsError, ChannelBoard, ChannelThread, C
 
 import requests
 import os
+import re
 
 
 class FourChanChannel(Channel):
     base_url = "https://a.4cdn.org"
     attachment_url = "https://i.4cdn.org"
+    tag_pattern = re.compile('<.*?>')
 
     def __init__(self):
         super().__init__()
 
     def name(self):
         return "4chan"
+
+    @staticmethod
+    def __strip__html__(s: str):
+        s = s.replace("<br>", "\n")
+        s = re.sub(FourChanChannel.tag_pattern, '', s)
+        s = s.replace("&#039;", "'")
+        s = s.replace("&quot;", "\"")
+        s = s.replace("&amp;", "&")
+        s = s.replace("&gt;", ">")
+        s = s.replace("&lt;", "<")
+        return s
 
     def get_attachment(self, client, board, thread, post, attachment, width, height):
         attachment_path = self.get_cache_key(board + "_" + attachment)
@@ -58,7 +71,7 @@ class FourChanChannel(Channel):
                     result_thread.attachment = str(thread["tim"]) + thread["ext"]
                     result_thread.attachment_width = thread["w"]
                     result_thread.attachment_height = thread["h"]
-                result_thread.comment = thread["com"]
+                result_thread.comment = FourChanChannel.__strip__html__(thread["com"])
                 threads.append(result_thread)
 
         return threads
@@ -82,7 +95,7 @@ class FourChanChannel(Channel):
                 result_post.attachment = str(post["tim"]) + post["ext"]
                 result_post.attachment_width = post["w"]
                 result_post.attachment_height = post["h"]
-            result_post.comment = post["com"]
+            result_post.comment = FourChanChannel.__strip__html__(post["com"])
             posts.append(result_post)
 
         return posts

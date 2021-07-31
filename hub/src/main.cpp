@@ -35,6 +35,10 @@ int main(int argc, const char** argv)
         {
             SocketChannelHub::SetVerbose();
         }
+        else if (arg == "-d")
+        {
+            SocketChannelHub::SetDebug();
+        }
         else if (arg == "-p")
         {
             if (i + 1 < argc)
@@ -48,5 +52,11 @@ int main(int argc, const char** argv)
     std::cout << "Starting hub on port " << port << std::endl;
 
     SocketChannelHub hub(port);
+
+    if (!hub.init())
+    {
+        return 1;
+    }
+
     return hub.run();
 }

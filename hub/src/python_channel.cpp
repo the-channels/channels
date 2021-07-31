@@ -20,7 +20,7 @@ CallbackStatus PythonChannel::get_attachment(
 
     try
     {
-        auto res = getattr(m_instance, "get_attachment")(m_client_settings[client], board, thread, post,
+        auto res = m_instance.attr("get_attachment")(m_client_settings[client], board, thread, post,
             attachment, width, height);
 
         fout = py::cast<std::string>(res);
@@ -39,7 +39,7 @@ GetBoardsResult PythonChannel::get_boards(int client, uint32_t limit)
 
     try
     {
-        auto res = getattr(m_instance, "get_boards")(m_client_settings[client], limit);
+        auto res = m_instance.attr("get_boards")(m_client_settings[client], limit);
         std::vector<Board> boards;
         for (auto& entry: py::list(res))
         {
@@ -70,7 +70,7 @@ GetThreadsResult PythonChannel::get_threads(int client, const BoardId &board)
 
     try
     {
-        auto res = getattr(m_instance, "get_threads")(m_client_settings[client], board);
+        auto res = m_instance.attr("get_threads")(m_client_settings[client], board);
         std::vector<Thread> threads;
         uint32_t num_posts = 0;
         for (auto& entry: py::list(res))
@@ -109,7 +109,7 @@ GetThreadResult PythonChannel::get_thread(int client, const BoardId &board, cons
 
     try
     {
-        auto res = getattr(m_instance, "get_thread")(m_client_settings[client], board, thread);
+        auto res = m_instance.attr("get_thread")(m_client_settings[client], board, thread);
         std::vector<Post> posts;
         uint32_t num_posts = 0;
         for (auto& entry: py::list(res))

@@ -49,6 +49,7 @@ A client and the hub communicate via a special protocol, as described in [this d
 ## How to build from source
 * The Hub is simply compiled using CMake. 
 * Take care to fetch all submodules.
+* The python CMake finds could be different from the python in your PATH, in that case you'd need to address that
 * The Client uses Makefiles and can only be compiled using [z88dk](https://github.com/z88dk/z88dk)
 * You'd need UNIX to compile the client, so for Windows, you would need to use WSL
 * Having all that done, then simply shoot `make`
@@ -86,7 +87,48 @@ docker run -d --tmpfs /channels/hub/bin/cache -p 9493:9493 -it channel_hub
 ```
 
 ## Debugging
-* The only way to debug is to use netlog, a printf-alike function that
+
+### Debugging python packages (channels) with PyCharm Professional
+
+* Build cmake in Debug mode. This way, python library would be installed in
+  "develop" mode (`setup.py develop`), and you won't have to reinstall updated
+  packages every time.
+* Open PyCharm and open up `hub/channels` folder in it. Run a `Python Debug Server`
+  configuration on port `5678`.
+* Specify the `-d` option to the Hub when running. When run, the hub will
+  attempt to join to the pycharm with `pydevd` to port `5678`.
+  Note that with `-d` option, the hub is running in a single threaded mode, so
+  it only can serve one client connection.
+* PyCharm breakpoints should work. After any modification, all you need is to
+  restart the hub (assuming you did the first step).
+  
+### Debugging python packages (channels) with Eclipse
+
+* Alternatively, install [Eclipse](https://www.eclipse.org/downloads/packages/installer)
+* Build cmake in Debug mode. This way, python library would be installed in
+  "develop" mode (`setup.py develop`), and you won't have to reinstall updated
+  packages every time.
+* Install `python3 pip install pydevd`
+* Select `Eclipse IDE for Eclipse Committers`
+* Select `Help -> Install New Software..`, put `http://pydev.org/updates` into "Work With",
+  search for `PyDev` and install it. Restart IDE.
+* Select `Open Perspective` and select `PyDev`.
+* Select `Window -> Preferences -> PyDev -> Inperpreters -> Python interpreter`,
+  select `New... -> Browse from python/pypy exe`, hit `Apply -> Apply and Close`.
+* Select `File -> New -> PyDev project`, select `/hub/channels` folder of this repository.
+* Select `PyDev -> Start Debug Server` (Note: That menu item should be present at the debug perspective and it can be enabled 
+  in other perspectives through `Window -> Perspective -> Customize perspective -> Tool Bar Visibility -> PyDev debug`).
+  If that thing complains, fiddle with `Action Set Availability`.
+* Specify the `-d` option to the Hub when running. When run, the hub will
+  attempt to join to the pycharm with `pydevd` to port `5678`.
+  Note that with `-d` option, the hub is running in a single threaded mode, so
+  it only can serve one client connection.
+  
+First time thing could be slow, so have some patience.
+
+### Debugging the client
+
+* The only way to debug the client is to use netlog, a printf-alike function that
 sends printed text to UDP port 9468 on the same host as proxy.
 * To see these logs on Linux/Mac, simply do `make listen-for-logs` while
 on Windows, you'd need to install netcat and do `nc -lLu -w 1 -p 9468`.

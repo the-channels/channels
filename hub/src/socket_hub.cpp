@@ -437,12 +437,20 @@ void SocketChannelHub::accept()
         return;
     }
 
-    std::thread connection_thread([this, sock]
+    if (IsDebug())
     {
+        std::cout << "Debugging mode, so running client on main thread " << sock << std::endl;
         process_socket(sock);
-    });
+    }
+    else
+    {
+        std::thread connection_thread([this, sock]
+        {
+            process_socket(sock);
+        });
+        connection_thread.detach();
+    }
 
-    connection_thread.detach();
 }
 
 int SocketChannelHub::run()

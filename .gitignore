@@ -1,6 +1,5 @@
 /hub/bin/
-/hub/cmake-build-debug/
-/hub/cmake-build-release-visual-studio/
+/hub/cmake-build-*
 /client/bin/
 /client/.idea
 /hub/.idea
@@ -10,8 +9,10 @@
 *_p.asm
 *_np.asm
 *.lib
+*.pyc
 deployment.xml
-/hub/cmake-build-release
 /hub/channels/build/
+/hub/venv
 /hub/channels/*.egg-info
 /hub/channels/dist
+.idea

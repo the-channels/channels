@@ -9,20 +9,49 @@
 
 ChannelHub* ChannelHub::s_hub = nullptr;
 bool ChannelHub::s_verbose = false;
+bool ChannelHub::s_debug = false;
 
 ChannelHub::ChannelHub() :
     m_image_processing(),
     m_python()
 {
     s_hub = this;
+}
 
-    py::module_ channels_module = py::module_::import("channels.base");
-
-    channels_module.attr("import_modules")(py::cpp_function([this](std::string name, std::string description, py::object clazz)
+bool ChannelHub::init()
+{
+    if (IsDebug())
     {
-        std::cout << "Registering channel: " << name << std::endl;
-        register_channel(name, new PythonChannel(name, description, clazz));
-    }));
+        using namespace pybind11::literals;
+
+        try
+        {
+            py::module_::import("pydevd").attr("settrace")("localhost", "port"_a=5678, "stdoutToServer"_a=true,
+                "stderrToServer"_a=true, "suspend"_a=false);
+        }
+        catch (py::error_already_set &e)
+        {
+            std::cerr << "Cannot connect to pydevd (" << e.what() << "), skipping debugging" << std::endl;
+        }
+    }
+
+    try
+    {
+        py::module_ channels_module = py::module_::import("channels.base");
+
+        channels_module.attr("import_modules")(py::cpp_function(
+            [this](std::string name, std::string description, py::object clazz)
+            {
+                std::cout << "Registering channel: " << name << std::endl;
+                register_channel(name, new PythonChannel(name, description, clazz));
+            }));
+    }
+    catch (py::error_already_set &e)
+    {
+        std::cerr << e.what() << std::endl;
+        return false;
+    }
+    return true;
 }
 
 void ChannelHub::register_channel(const ChannelId& channel_id, Channel* ptr)

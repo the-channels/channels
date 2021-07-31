@@ -64,10 +64,13 @@ class ChannelHub
 {
 public:
     ChannelHub();
+    bool init();
 
 public:
     static bool IsVerbose() { return s_verbose; }
     static void SetVerbose() { s_verbose = true; }
+    static bool IsDebug() { return s_debug; }
+    static void SetDebug() { s_debug = true; }
     static ChannelHub* Get() { return s_hub; }
 
 public:
@@ -95,6 +98,7 @@ private:
 private:
     static ChannelHub* s_hub;
     static bool s_verbose;
+    static bool s_debug;
 
     CatalogCache m_catalog_cache;
     std::mutex m_catalog_cache_mutex;

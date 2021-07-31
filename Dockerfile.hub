@@ -11,7 +11,7 @@ ADD hub/CMakeLists.txt /channels/hub
 ADD proto /channels/proto
 RUN mkdir /build
 WORKDIR /build
-RUN cmake -S /channels/hub -B /build
+RUN cmake -DCMAKE_BUILD_TYPE=Release -S /channels/hub -B /build
 RUN make
 WORKDIR /channels/hub/bin
-ENTRYPOINT ["/channels/hub/bin/channel_hub"]
+ENTRYPOINT ["/channels/hub/bin/channels_hub"]
