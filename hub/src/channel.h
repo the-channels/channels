@@ -19,9 +19,9 @@ public:
     virtual CallbackStatus get_attachment(int client, const BoardId &board, const ThreadId &thread, const PostId &post,
         const std::string& attachment, uint32_t width, uint32_t height,
         std::string& fout) = 0;
-    virtual GetBoardsResult get_boards(int client, uint32_t limit) = 0;
-    virtual GetThreadsResult get_threads(int client, const BoardId &board) = 0;
-    virtual GetThreadResult get_thread(int client, const BoardId &board, const ThreadId &thread) = 0;
+    virtual GetChannelBoardsResult get_boards(int client, uint32_t limit) = 0;
+    virtual GetChannelThreadsResult get_threads(int client, const BoardId &board) = 0;
+    virtual GetChannelThreadResult get_thread(int client, const BoardId &board, const ThreadId &thread) = 0;
     virtual void new_client(int client) {}
     virtual void client_released(int client) {}
 

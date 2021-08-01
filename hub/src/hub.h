@@ -82,9 +82,9 @@ public:
         ImageProcessing::ImageEncoding encoding);
     GetBoardsResult get_boards(int client, const ChannelId &channel, uint32_t limit);
     GetThreadsResult get_threads(int client, const ChannelId &channel, const BoardId &board,
-        bool flush, uint32_t offset, uint32_t limit);
+        bool flush);
     GetThreadResult get_thread(int client, const ChannelId &channel, const BoardId &board, const ThreadId &thread,
-        bool flush, uint32_t offset, uint32_t limit);
+        bool flush);
 
     void new_client(int client);
     void client_released(int client);

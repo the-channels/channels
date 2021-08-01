@@ -128,7 +128,7 @@ server.
 }]
 ```
 
-* `<api-version>`: The version of the API, currently `2`
+* `<api-version>`: The version of the API, currently `3`
 
 ## Get Channels
 

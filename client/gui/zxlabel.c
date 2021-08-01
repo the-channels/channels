@@ -90,6 +90,8 @@ static void label_render(uint8_t x, uint8_t y, struct gui_label_t* this, struct 
 
 uint8_t zxgui_label_text_height(uint8_t w, const char* title, uint16_t len)
 {
+    w--;
+
     char* c = (char*)title;
     const char* end = c + len;
     uint8_t res = 0;

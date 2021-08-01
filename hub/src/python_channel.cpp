@@ -33,7 +33,7 @@ CallbackStatus PythonChannel::get_attachment(
     }
 }
 
-GetBoardsResult PythonChannel::get_boards(int client, uint32_t limit)
+GetChannelBoardsResult PythonChannel::get_boards(int client, uint32_t limit)
 {
     py::gil_scoped_acquire acquire;
 
@@ -55,16 +55,16 @@ GetBoardsResult PythonChannel::get_boards(int client, uint32_t limit)
             }
             boards.push_back(board);
         }
-        return GetBoardsResult(CallbackStatus::ok, std::move(boards));
+        return GetChannelBoardsResult(CallbackStatus::ok, std::move(boards));
     }
     catch (py::error_already_set &e)
     {
         std::cerr << e.what() << std::endl;
-        return GetBoardsResult(CallbackStatus::failed, std::vector<Board>());
+        return GetChannelBoardsResult(CallbackStatus::failed, std::vector<Board>());
     }
 }
 
-GetThreadsResult PythonChannel::get_threads(int client, const BoardId &board)
+GetChannelThreadsResult PythonChannel::get_threads(int client, const BoardId &board)
 {
     py::gil_scoped_acquire acquire;
 
@@ -75,7 +75,7 @@ GetThreadsResult PythonChannel::get_threads(int client, const BoardId &board)
         uint32_t num_posts = 0;
         for (auto& entry: py::list(res))
         {
-            Thread thread;
+            Thread thread = {};
             thread.id = py::cast<std::string>(py::getattr(entry, "id"));
             if (!py::isinstance<py::none>(py::getattr(entry, "title")))
             {
@@ -91,19 +91,23 @@ GetThreadsResult PythonChannel::get_threads(int client, const BoardId &board)
                 thread.attachment_width = py::cast<int>(py::getattr(entry, "attachment_width"));
                 thread.attachment_height = py::cast<int>(py::getattr(entry, "attachment_height"));
             }
+            if (py::isinstance<py::int_>(py::getattr(entry, "num_replies")))
+            {
+                thread.num_replies = py::cast<int>(py::getattr(entry, "num_replies"));
+            }
             threads.push_back(thread);
             num_posts++;
         }
-        return GetThreadsResult(CallbackStatus::ok, std::move(threads), num_posts);
+        return GetChannelThreadsResult(CallbackStatus::ok, std::move(threads), num_posts);
     }
     catch (py::error_already_set &e)
     {
         std::cerr << e.what() << std::endl;
-        return GetThreadsResult(CallbackStatus::failed);
+        return GetChannelThreadsResult(CallbackStatus::failed);
     }
 }
 
-GetThreadResult PythonChannel::get_thread(int client, const BoardId &board, const ThreadId &thread)
+GetChannelThreadResult PythonChannel::get_thread(int client, const BoardId &board, const ThreadId &thread)
 {
     py::gil_scoped_acquire acquire;
 
@@ -114,7 +118,7 @@ GetThreadResult PythonChannel::get_thread(int client, const BoardId &board, cons
         uint32_t num_posts = 0;
         for (auto& entry: py::list(res))
         {
-            Post post;
+            Post post = {};
             post.id = py::cast<std::string>(py::getattr(entry, "id"));
             if (!py::isinstance<py::none>(py::getattr(entry, "title")))
             {
@@ -130,15 +134,24 @@ GetThreadResult PythonChannel::get_thread(int client, const BoardId &board, cons
                 post.attachment_width = py::cast<int>(py::getattr(entry, "attachment_width"));
                 post.attachment_height = py::cast<int>(py::getattr(entry, "attachment_height"));
             }
+            if (py::isinstance<py::list>(py::getattr(entry, "replies")))
+            {
+                post.replies.clear();
+
+                for (auto reply: py::cast<py::list>(py::getattr(entry, "replies")))
+                {
+                    post.replies.push_back(py::cast<std::string>(reply));
+                }
+            }
             posts.push_back(post);
             num_posts++;
         }
-        return GetThreadResult(CallbackStatus::ok, std::move(posts), num_posts);
+        return GetChannelThreadResult(CallbackStatus::ok, std::move(posts), num_posts);
     }
     catch (py::error_already_set &e)
     {
         std::cerr << e.what() << std::endl;
-        return GetThreadResult(CallbackStatus::failed);
+        return GetChannelThreadResult(CallbackStatus::failed);
     }
 }
 

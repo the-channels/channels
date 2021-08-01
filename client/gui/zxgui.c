@@ -23,6 +23,7 @@ void zxgui_init()
     font_state.fgnd_attr = BRIGHT | INK_GREEN | PAPER_BLACK;
     font_state.fgnd_mask = 0;
     font_state.fzx_draw = _fzx_draw_or;
+    font_state.left_margin = 0;
 
     font_state.y = 32;
     font_state.x = 0;

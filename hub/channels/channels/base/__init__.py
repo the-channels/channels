@@ -14,6 +14,7 @@ class ChannelThread(object):
         self.attachment = None
         self.attachment_width = 0
         self.attachment_height = 0
+        self.num_replies = 0
         self.date = 0
 
 
@@ -25,6 +26,7 @@ class ChannelPost(object):
         self.attachment = None
         self.attachment_width = 0
         self.attachment_height = 0
+        self.replies = []
         self.date = 0
 
 

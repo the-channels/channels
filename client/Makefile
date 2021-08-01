@@ -56,8 +56,9 @@ bin/channels__.bin: spectranet-libraries bin $(OBJECTS)
 bin:
 	@mkdir -p bin
 
-channels: channels-bin
+channels: channels-bin channels-tap
 channels-bin: bin/channels__.bin
+channels-tap: bin/channels.tap
 
 boot-zx: channels-bin
 	cp boot/boot.zx bin/boot.zx

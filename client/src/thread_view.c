@@ -12,12 +12,10 @@
 #include "heap.h"
 
 /* 28 pages of 4k each are available to us, each page fits 2 posts (1k post 1k post image) */
-#define ENTRIES_PER_REQUEST (20)
+#define ENTRIES_PER_REQUEST (16)
 #define MAX_ENTRIES_PER_SCREEN (8)
 #define SELECTED_THREAD_COLOR (BRIGHT | INK_YELLOW | PAPER_BLACK)
-#define DESELECTED_THREAD_COLOR (INK_WHITE | PAPER_BLACK)
-#define SELECTED_THREAD_CHAR (GUI_SELECTED_ENTRY)
-#define DESELECTED_THREAD_CHAR (GUI_EDIT_TOP)
+#define DESELECTED_THREAD_COLOR (INK_BLACK | PAPER_BLACK)
 
 static struct gui_scene_t thread_scene;
 static struct gui_object_t* last_thread_static_object;
@@ -37,6 +35,8 @@ static uint8_t requests_locked = 0;
 static uint8_t stop_fetching_attachments_and_leave = 0;
 static uint8_t flush = 0;
 static uint16_t entry_offset = 0;
+static uint16_t reply_cached_offset = 0;
+static uint16_t reply_cached_screen = 0;
 static uint8_t process_screen_h = 0;
 static uint8_t process_screen_num = 0;
 static uint8_t process_entries_on_screen = 0;
@@ -45,10 +45,17 @@ static uint8_t num_entries_total = 0;
 static uint8_t entry_count_recv = 0;
 static uint8_t* display_ptr = NULL;
 static uint8_t auto_select_last = 0;
+static uint8_t auto_select_screen = 0;
 
 static char thread_title[64];
 static char post_title[96];
 static uint8_t post_mode = 0;
+
+#define MAX_REPLY_STACK (8)
+struct reply_stack_entry
+{
+    char reply_id[48];
+};
 
 #define ENTRY_FLAG_HAS_ATTACHMENT (0x01)
 #define ENTRY_FLAG_ATTACHMENT_BEING_RECEIVED (0x02)
@@ -63,11 +70,11 @@ struct channel_ui_entry_t
 
 struct channel_entry_t
 {
-    char id[64];
+    char id[48];
     struct channel_ui_entry_t* ui;
     uint8_t flags;
-    uint16_t attachment_w;
-    uint16_t attachment_h;
+    uint8_t attachment_w;
+    uint8_t attachment_h;
     uint8_t screen_y;
     uint8_t height;
     uint8_t screen_num;
@@ -77,11 +84,14 @@ struct channel_entry_t
     uint8_t comment_blob_id;
     uint8_t attachment_blob_id;
     uint16_t attachment_recv_size;
+    uint8_t replies;
 };
 
-static struct channel_entry_t entries[ENTRIES_PER_REQUEST];
-static struct channel_ui_entry_t ui_entries[MAX_ENTRIES_PER_SCREEN];
+static struct channel_entry_t* entries = NULL;
 static uint8_t last_allocated_entry = 0;
+static struct channel_ui_entry_t* ui_entries = NULL;
+static uint8_t replies_stack_pointer = 0;
+static struct reply_stack_entry replies_stack[MAX_REPLY_STACK];
 static struct channel_entry_t* selected_entry;
 static struct channel_entry_t* first_display_entry;
 static struct channel_entry_t* first_entry;
@@ -128,6 +138,11 @@ static void free_view()
     reset_heap();
     reset_heap_blobs();
 
+    entries = malloc(sizeof(struct channel_entry_t) * ENTRIES_PER_REQUEST);
+    ui_entries = malloc(sizeof(struct channel_ui_entry_t) * MAX_ENTRIES_PER_SCREEN);
+
+    proto_assert_str(entries && ui_entries, "Cannot allocate");
+
     attachment_being_requested = NULL;
     first_display_entry = NULL;
     selected_entry = NULL;
@@ -165,12 +180,14 @@ static void highlight_thread(struct channel_entry_t* th)
 {
     if (selected_entry && (selected_entry != th))
     {
-        zxgui_line(DESELECTED_THREAD_COLOR, 0, selected_entry->screen_y, 32, DESELECTED_THREAD_CHAR);
+        zxgui_screen_color(DESELECTED_THREAD_COLOR);
+        zxgui_screen_recolor(1, selected_entry->screen_y, 31, 1);
     }
 
     selected_entry = th;
 
-    zxgui_line(SELECTED_THREAD_COLOR, 0, selected_entry->screen_y, 32, SELECTED_THREAD_CHAR);
+    zxgui_screen_color(SELECTED_THREAD_COLOR);
+    zxgui_screen_recolor(1, selected_entry->screen_y, 31, 1);
 }
 
 static void get_entries_error(const char* error)
@@ -194,11 +211,32 @@ static void switch_back_to_boards(struct gui_button_t* this)
     switch_select_board();
 }
 
+static uint8_t request();
+
 static void switch_back_to_threads(struct gui_button_t* this)
 {
     if (requests_locked)
     {
         stop_fetching_attachments_and_leave = 1;
+        return;
+    }
+
+    if (replies_stack_pointer)
+    {
+        replies_stack_pointer--;
+
+        if (replies_stack_pointer == 0)
+        {
+            entry_offset = reply_cached_offset;
+            auto_select_screen = reply_cached_screen;
+            reply_cached_offset = 0;
+            auto_select_last = 0;
+        }
+
+        if (request() == 0)
+        {
+            switch_progress(replies_stack_pointer ? "Opening Replies" : "Opening Original Thread", NULL);
+        }
         return;
     }
 
@@ -248,6 +286,11 @@ static void open_full_picture(struct gui_button_t* this)
 {
     if (requests_locked)
         return;
+
+    if (selected_entry == NULL || ((selected_entry->flags & ENTRY_FLAG_HAS_ATTACHMENT) == 0))
+    {
+        return;
+    }
 
     zxgui_scene_set(&scene_full_image);
 
@@ -340,13 +383,18 @@ static void redraw_screen()
 
     if (post_mode)
     {
-        sprintf(post_title, "%s %s %s %d/%d", channels_get_channel(), channels_get_board(),
-            channels_get_thread(), first_display_entry->offset + 1, num_entries_total);
+        if (replies_stack_pointer)
+        {
+            sprintf(post_title, "replies level %d", replies_stack_pointer);
+        }
+        else
+        {
+            sprintf(post_title, "%s %s %s", channels_get_channel(), channels_get_board(), channels_get_thread());
+        }
     }
     else
     {
-        sprintf(thread_title, "%s %s %d/%d", channels_get_channel(), channels_get_board(),
-            first_display_entry->offset + 1, num_entries_total);
+        sprintf(thread_title, "%s %s", channels_get_channel(), channels_get_board());
     }
 
     last_thread_static_object->next = NULL;
@@ -369,15 +417,22 @@ static void redraw_screen()
         th->ui = ui;
         uint8_t h = th->screen_y;
 
-        if (selected_entry == th)
-        {
-            zxgui_line(SELECTED_THREAD_COLOR, 0, h, 32, SELECTED_THREAD_CHAR);
-        }
-        else
-        {
-            zxgui_line(DESELECTED_THREAD_COLOR, 0, h, 32, DESELECTED_THREAD_CHAR);
-        }
+        zxgui_screen_color(SELECTED_THREAD_COLOR);
+        zxgui_screen_put(0, h, GUI_ICON_REPLY);
 
+        uint8_t cc = selected_entry == th ? SELECTED_THREAD_COLOR : DESELECTED_THREAD_COLOR;
+
+        zxgui_screen_color(cc);
+        zxgui_line(cc, 1, h, 26, GUI_SELECTED_ENTRY);
+        zxgui_screen_clear(28, h, 8, 1);
+        zxgui_screen_recolor(28, h, 8, 1);
+        zxgui_screen_put(28, h, GUI_ICON_REPLIES);
+
+        font_state.fgnd_attr = cc;
+        fzx_at(&font_state, 29 * 8 + 1, h * 8 + 1);
+        char header[8];
+        sprintf(header, "%d", th->replies);
+        fzx_puts(&font_state, header);
 
         h++;
 
@@ -511,7 +566,14 @@ static void select_prev_entry(struct gui_button_t* this)
             if (requests_locked)
                 return;
 
-            entry_offset -= ENTRIES_PER_REQUEST;
+            if (entry_offset > ENTRIES_PER_REQUEST)
+            {
+                entry_offset -= ENTRIES_PER_REQUEST;
+            }
+            else
+            {
+                entry_offset = 0;
+            }
             auto_select_last = 1;
             request();
         }
@@ -533,6 +595,41 @@ static void open_thread(struct gui_button_t* this)
     if (request() == 0)
     {
         switch_progress("Opening Thread", NULL);
+    }
+}
+
+static void open_replies(struct gui_button_t* this)
+{
+    if (requests_locked)
+        return;
+
+    if (post_mode == 0)
+        return;
+
+    if (selected_entry->replies == 0)
+        return;
+
+    if (replies_stack_pointer >= MAX_REPLY_STACK)
+        return;
+
+    if (replies_stack_pointer == 0)
+    {
+        reply_cached_offset = entry_offset;
+        reply_cached_screen = current_screen;
+    }
+
+    strcpy(replies_stack[replies_stack_pointer].reply_id, selected_entry->id);
+
+    netlog("Opening replies %s/%s/%s for %s off %d\n", channels_get_channel(), channels_get_board(), channels_get_thread(),
+       selected_entry->id, entry_offset);
+
+    replies_stack_pointer++;
+    entry_offset = 0;
+    flush = 0;
+
+    if (request() == 0)
+    {
+        switch_progress("Opening Replies", NULL);
     }
 }
 
@@ -618,7 +715,8 @@ static void fetch_next_thread_attachment()
         return;
     }
 
-    while ((attachment_being_requested->flags & ENTRY_FLAG_HAS_ATTACHMENT) == 0)
+    while (((attachment_being_requested->flags & ENTRY_FLAG_HAS_ATTACHMENT) == 0) ||
+            (attachment_being_requested->flags & ENTRY_FLAG_ATTACHMENT_RECEIVED))
     {
         attachment_being_requested = attachment_being_requested->next;
 
@@ -633,8 +731,8 @@ static void fetch_next_thread_attachment()
     attachment_being_requested->attachment_recv_size = 0;
     attachment_being_requested->flags |= ENTRY_FLAG_ATTACHMENT_BEING_RECEIVED;
 
-    uint16_t target_w = attachment_being_requested->attachment_w * 8;
-    uint16_t target_h = attachment_being_requested->attachment_h * 8;
+    uint16_t target_w = (uint16_t)attachment_being_requested->attachment_w * 8;
+    uint16_t target_h = (uint16_t)attachment_being_requested->attachment_h * 8;
 
     netlog("fetching attachment %dx%d\n",
         attachment_being_requested->attachment_w, attachment_being_requested->attachment_h);
@@ -739,7 +837,7 @@ static void init_post_scene()
 
     {
         static struct gui_label_t post_label;
-        zxgui_label_init(&post_label, 17, 23, 13, 1, post_title, INK_GREEN | PAPER_BLACK, 0);
+        zxgui_label_init(&post_label, 21, 23, 9, 1, post_title, INK_GREEN | PAPER_BLACK, 0);
         zxgui_scene_add(&post_scene, &post_label);
     }
 
@@ -750,32 +848,38 @@ static void init_post_scene()
     }
 
     {
+        static struct gui_button_t replies;
+        zxgui_button_init(&replies, 4, 23, 0, 1, 13, GUI_ICON_RETURN, "REPL?", open_replies);
+        zxgui_scene_add(&post_scene, &replies);
+    }
+
+    {
         static struct gui_button_t button_picture;
-        zxgui_button_init(&button_picture, 4, 23, 0, 1, 'p', GUI_ICON_P, "PIC", open_full_picture);
+        zxgui_button_init(&button_picture, 8, 23, 0, 1, 'p', GUI_ICON_P, "PIC", open_full_picture);
         zxgui_scene_add(&post_scene, &button_picture);
     }
 
     {
         static struct gui_button_t next_thread;
-        zxgui_button_init(&next_thread, 7, 23, 1, 1, 10, GUI_ICON_MORE_TO_FOLLOW, NULL, select_next_entry);
+        zxgui_button_init(&next_thread, 11, 23, 1, 1, 10, GUI_ICON_MORE_TO_FOLLOW, NULL, select_next_entry);
         zxgui_scene_add(&post_scene, &next_thread);
     }
 
     {
         static struct gui_button_t next_thread_6;
-        zxgui_button_init(&next_thread_6, 8, 23, 4, 1, '6', GUI_ICON_6, "NEXT", select_next_entry);
+        zxgui_button_init(&next_thread_6, 12, 23, 4, 1, '6', GUI_ICON_6, "NEXT", select_next_entry);
         zxgui_scene_add(&post_scene, &next_thread_6);
     }
 
     {
         static struct gui_button_t prev_thread;
-        zxgui_button_init(&prev_thread, 12, 23, 1, 1, 11, GUI_ICON_LESS_TO_FOLLOW, NULL, select_prev_entry);
+        zxgui_button_init(&prev_thread, 16, 23, 1, 1, 11, GUI_ICON_LESS_TO_FOLLOW, NULL, select_prev_entry);
         zxgui_scene_add(&post_scene, &prev_thread);
     }
 
     {
         static struct gui_button_t prev_thread_7;
-        zxgui_button_init(&prev_thread_7, 13, 23, 4, 1, '7', GUI_ICON_7, "PREV", select_prev_entry);
+        zxgui_button_init(&prev_thread_7, 17, 23, 4, 1, '7', GUI_ICON_7, "PREV", select_prev_entry);
         zxgui_scene_add(&post_scene, &prev_thread_7);
     }
 
@@ -908,6 +1012,8 @@ static void process_entry(ChannelObject* object)
         comment_blob_data[comment->value_size] = 0;
         close_heap_blob();
 
+        th->replies = get_uint16_property(object, 'r', 0);
+
         if (th->flags & ENTRY_FLAG_HAS_ATTACHMENT)
         {
             th->attachment_blob_id = allocate_heap_blob();
@@ -916,8 +1022,6 @@ static void process_entry(ChannelObject* object)
         {
             th->attachment_blob_id = 0xFF;
         }
-
-        th->offset = entry_offset + entry_count_recv++;
 
         if (last_entry)
         {
@@ -936,6 +1040,12 @@ static void process_entry(ChannelObject* object)
 
 static void get_entries_response(struct proto_process_t* proto)
 {
+    if (first_entry == NULL)
+    {
+        switch_alert("Server returned empty response", switch_connect_to_proxy);
+        return;
+    }
+
     if (auto_select_last)
     {
         first_display_entry = first_entry;
@@ -955,11 +1065,27 @@ static void get_entries_response(struct proto_process_t* proto)
     }
     else
     {
-        selected_entry = first_entry;
         first_display_entry = first_entry;
+
+        if (auto_select_screen)
+        {
+            while (first_display_entry)
+            {
+                if (first_display_entry->screen_num == auto_select_screen)
+                {
+                    break;
+                }
+
+                first_display_entry = first_display_entry->next;
+            }
+
+            auto_select_screen = 0;
+        }
+
+        selected_entry = first_display_entry;
     }
 
-    attachment_being_requested = first_display_entry;
+    attachment_being_requested = first_entry;
     fetch_next_thread_attachment();
     redraw_screen();
 }
@@ -979,7 +1105,10 @@ static uint8_t request()
     declare_arg_property_on_stack(offset_, 'o', entry_offset, &limit_);
     declare_arg_property_on_stack(flush_, 'f', flush, &offset_);
 
-    declare_object_on_stack(request, 128, &flush_);
+    declare_str_property_on_stack(replies_to, 'r',
+        (replies_stack_pointer ? (const char*)replies_stack[replies_stack_pointer - 1].reply_id : ""), &flush_);
+
+    declare_object_on_stack(request, 128, &replies_to);
 
     flush = 0;
     stop_fetching_attachments_and_leave = 0;
@@ -1005,6 +1134,7 @@ static uint8_t request()
 void switch_thread_view()
 {
     entry_offset = 0;
+    auto_select_last = 0;
     requests_locked = 0;
     flush = 1;
     post_mode = 0;

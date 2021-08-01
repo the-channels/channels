@@ -51,7 +51,9 @@ enum gui_tiles {
     GUI_ICON_7,
     GUI_ICON_LOADING_SMALL_1,
     GUI_ICON_LOADING_SMALL_2,
-    GUI_SELECTED_ENTRY
+    GUI_SELECTED_ENTRY,
+    GUI_ICON_REPLIES,
+    GUI_ICON_REPLY
 };
 
 enum gui_event_type {

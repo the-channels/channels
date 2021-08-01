@@ -10,9 +10,10 @@
 #endif
 #include <thread>
 #include <iostream>
+#include <set>
 #include <functional>
 
-static const std::string protocol_version = "2";
+static const std::string protocol_version = "3";
 
 static std::string get_string_property(ChannelObject* o, uint8_t key)
 {
@@ -107,7 +108,7 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
         uint16_t limit = get_uint16_property(channel_object, 'l', 128);
         uint16_t offset = get_uint16_property(channel_object, 'o', 0);
 
-        auto res = Get()->get_threads(client, channel, board, flush, offset, limit);
+        auto res = Get()->get_threads(client, channel, board, flush);
 
         if (res.status != CallbackStatus::ok)
         {
@@ -121,9 +122,14 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
             result.push_back(channel_object_allocate(&id_));
         }
 
-        for (auto& th: res.threads)
+        if (offset < res.threads->size())
         {
-            result.push_back(th.write());
+            auto end = limit + offset < res.threads->size() ? res.threads->begin() + limit + offset : res.threads->end();
+
+            for (auto ptr = res.threads->begin() + offset; ptr < end; ptr++)
+            {
+                result.push_back(ptr->write());
+            }
         }
 
         return nullptr;
@@ -246,27 +252,81 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
             return "Missing thread";
         }
 
+        PostId replies_to = get_string_property(channel_object, 'r');
         bool flush = get_uint8_property(channel_object, 'f', 0);
         uint16_t limit = get_uint16_property(channel_object, 'l', 128);
         uint16_t offset = get_uint16_property(channel_object, 'o', 0);
 
-        auto res = Get()->get_thread(client, channel, board, thread, flush, offset, limit);
+        auto res = Get()->get_thread(client, channel, board, thread, flush);
 
         if (res.status != CallbackStatus::ok)
         {
             return "Cannot obtain boards";
         }
 
+        if (!replies_to.empty())
         {
-            std::string posts = std::to_string(res.num_posts);
-            declare_str_property_on_stack(id_, 'c', posts.c_str(), nullptr);
+            std::set<PostId> post_filter;
 
-            result.push_back(channel_object_allocate(&id_));
+            for (auto& th: *res.posts)
+            {
+                if (th.id == replies_to)
+                {
+                    for (auto& reply: th.replies)
+                    {
+                        post_filter.insert(reply);
+                    }
+                    break;
+                }
+            }
+
+            std::vector<const Post*> slice;
+
+            for (auto& th: *res.posts)
+            {
+                if (post_filter.find(th.id) == post_filter.end())
+                {
+                    continue;
+                }
+
+                slice.push_back(&th);
+            }
+
+            {
+                std::string posts = std::to_string(slice.size());
+                declare_str_property_on_stack(id_, 'c', posts.c_str(), nullptr);
+
+                result.push_back(channel_object_allocate(&id_));
+            }
+
+            if (offset < slice.size())
+            {
+                auto end = limit + offset < slice.size() ? slice.begin() + limit + offset : slice.end();
+
+                for (auto ptr = slice.begin() + offset; ptr < end; ptr++)
+                {
+                    result.push_back((*ptr)->write());
+                }
+            }
         }
-
-        for (auto& th: res.posts)
+        else
         {
-            result.push_back(th.write());
+            {
+                std::string posts = std::to_string(res.num_posts);
+                declare_str_property_on_stack(id_, 'c', posts.c_str(), nullptr);
+
+                result.push_back(channel_object_allocate(&id_));
+            }
+
+            if (offset < res.posts->size())
+            {
+                auto end = limit + offset < res.posts->size() ? res.posts->begin() + limit + offset : res.posts->end();
+
+                for (auto ptr = res.posts->begin() + offset; ptr < end; ptr++)
+                {
+                    result.push_back(ptr->write());
+                }
+            }
         }
 
         return nullptr;

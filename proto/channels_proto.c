@@ -66,13 +66,18 @@ int channels_proto_listen(int port)
 #endif
 
 #ifdef CHANNELS_PROTO_CLIENT
-int channels_proto_connect(const char* host, int port, disconnected_callback_f disconnected)
+void channels_proto_disconnect()
 {
     if (client_socket)
     {
         sockclose(client_socket);
         client_socket = 0;
     }
+}
+
+int channels_proto_connect(const char* host, int port, disconnected_callback_f disconnected)
+{
+    channels_proto_disconnect();
 
     client_disconnected = disconnected;
 

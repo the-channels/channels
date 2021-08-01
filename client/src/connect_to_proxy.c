@@ -10,7 +10,7 @@
 static struct gui_scene_t scene;
 static struct gui_image_t logo;
 static struct gui_edit_t connect_address;
-static const char* supported_api_version = "2";
+static const char* supported_api_version = "3";
 static char server_api_version[8] = {};
 
 static void disconnected()
@@ -90,6 +90,7 @@ void init_connect_to_proxy()
 
     {
         zxgui_edit_init(&connect_address, 0, 0, 13, 2);
+        strcpy(connect_address.value, "127.0.0.1");
         zxgui_form_add_child(&connect_to_proxy, &connect_address);
     }
 
@@ -107,7 +108,7 @@ void init_connect_to_proxy()
 
 void switch_connect_to_proxy()
 {
-    strcpy(connect_address.value, "127.0.0.1");
+    channels_proxy_disconnect();
 
     zxgui_scene_set(&scene);
     zxgui_scene_set_focus(&scene, &connect_address);

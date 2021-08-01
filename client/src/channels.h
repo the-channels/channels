@@ -11,6 +11,7 @@ typedef void (*channels_object_callback_f)(ChannelObject* object);
 typedef void (*channels_error_callback_f)(const char* error);
 
 extern uint8_t channels_proxy_connect(const char* address, channels_disconnected_callback_f disconnected);
+extern void channels_proxy_disconnect();
 extern void channels_proxy_update();
 extern void channels_set_channel(const char* channel);
 extern const char* channels_get_channel();

@@ -8,7 +8,8 @@ import re
 class FourChanChannel(Channel):
     base_url = "https://a.4cdn.org"
     attachment_url = "https://i.4cdn.org"
-    tag_pattern = re.compile('<.*?>')
+    tag_pattern = re.compile(r'<.*?>', re.MULTILINE)
+    post_reply_pattern = re.compile(r'>>([0-9]+)', re.MULTILINE)
 
     def __init__(self):
         super().__init__()
@@ -67,7 +68,8 @@ class FourChanChannel(Channel):
                 result_thread = ChannelThread(str(thread["no"]))
                 if "sub" in thread:
                     result_thread.title = thread["sub"]
-                if ("tim" in thread) and ("ext" in thread) and ("w" in thread) and ("h" in thread) :
+                result_thread.num_replies = thread["replies"] if "replies" in thread else 0
+                if ("tim" in thread) and ("ext" in thread) and ("w" in thread) and ("h" in thread):
                     result_thread.attachment = str(thread["tim"]) + thread["ext"]
                     result_thread.attachment_width = thread["w"]
                     result_thread.attachment_height = thread["h"]
@@ -82,6 +84,7 @@ class FourChanChannel(Channel):
             raise ChannelsError(ChannelsError.UNKNOWN_ERROR)
         result = r.json()
         posts = []
+        posts_by_id = {}
 
         for post in result["posts"]:
             if "no" not in post:
@@ -91,12 +94,19 @@ class FourChanChannel(Channel):
             result_post = ChannelPost(str(post["no"]))
             if "sub" in post:
                 result_post.title = post["sub"]
-            if ("tim" in post) and ("ext" in post) and ("w" in post) and ("h" in post) :
+            if ("tim" in post) and ("ext" in post) and ("w" in post) and ("h" in post):
                 result_post.attachment = str(post["tim"]) + post["ext"]
                 result_post.attachment_width = post["w"]
                 result_post.attachment_height = post["h"]
             result_post.comment = FourChanChannel.__strip__html__(post["com"])
+
+            for reply in re.finditer(FourChanChannel.post_reply_pattern, result_post.comment):
+                reply_to = reply.group(1)
+                if reply_to in posts_by_id:
+                    posts_by_id[reply_to].replies.append(result_post.id)
+
             posts.append(result_post)
+            posts_by_id[result_post.id] = result_post
 
         return posts
 

@@ -38,6 +38,7 @@ void zxgui_scene_add(struct gui_scene_t* scene, void* object)
 {
     struct gui_object_t* last = zxgui_scene_get_last_object(scene);
     struct gui_object_t* o = (struct gui_object_t*)object;
+    o->next = NULL;
     if (last == NULL)
     {
         scene->child = o;

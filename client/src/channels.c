@@ -33,6 +33,11 @@ uint8_t channels_proxy_connect(const char* address, channels_disconnected_callba
     return 0;
 }
 
+void channels_proxy_disconnect()
+{
+    channels_proto_disconnect();
+}
+
 static void* channels_new_request(int socket, struct proto_process_t* proto)
 {
     return NULL;

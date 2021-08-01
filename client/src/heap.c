@@ -5,7 +5,7 @@
 #include "proto_asserts.h"
 #include "system.h"
 
-uint8_t heap_data[2560];
+uint8_t heap_data[3200];
 
 uint8_t next_allocated_blob = 0;
 

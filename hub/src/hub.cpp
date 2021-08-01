@@ -188,7 +188,7 @@ GetImageResult ChannelHub::get_image(int client, const ChannelId &channel, const
 
 GetThreadsResult ChannelHub::get_threads(
     int client, const ChannelId &channel, const BoardId &board,
-    bool flush, uint32_t offset, uint32_t limit)
+    bool flush)
 {
     {
         std::lock_guard<std::mutex> cache_guard(m_catalog_cache_mutex);
@@ -196,18 +196,14 @@ GetThreadsResult ChannelHub::get_threads(
 
         if (!flush && cached_catalog != m_catalog_cache.end())
         {
-            auto& catalog = cached_catalog->second;
-            std::vector<class Thread> result;
-            auto end = limit + offset < catalog.size() ? catalog.begin() + limit + offset : catalog.end();
-            std::copy(catalog.begin() + offset, end, std::back_inserter(result));
-            return GetThreadsResult(CallbackStatus::ok, std::move(result), catalog.size());
+            return GetThreadsResult(CallbackStatus::ok, &cached_catalog->second, cached_catalog->second.size());
         }
     }
 
     const ChannelPtr& ch = get_channel(channel);
     if (ch == nullptr)
     {
-        return GetThreadsResult(CallbackStatus::unknown_resource, std::vector<class Thread>(), 0);
+        return GetThreadsResult(CallbackStatus::unknown_resource);
     }
 
     auto res = ch->get_threads(client, board);
@@ -216,47 +212,35 @@ GetThreadsResult ChannelHub::get_threads(
     {
         {
             std::lock_guard<std::mutex> cache_guard(m_catalog_cache_mutex);
-            m_catalog_cache[{client, channel, board}] = res.threads;
+            m_catalog_cache[{client, channel, board}] = std::move(res.threads);
         }
 
-        std::vector<class Thread> result;
-        if (offset < res.threads.size())
-        {
-            auto end = limit + offset < res.threads.size() ? res.threads.begin() + limit + offset : res.threads.end();
-            result.insert(result.end(), res.threads.begin() + offset, end);
-        }
-        return GetThreadsResult(CallbackStatus::ok, std::move(result), res.threads.size());
+        auto rr = m_catalog_cache.find({client, channel, board});
+        return GetThreadsResult(CallbackStatus::ok, &rr->second, rr->second.size());
     }
     else
     {
-        return res;
+        return GetThreadsResult(res.status);
     }
 }
 
 GetThreadResult ChannelHub::get_thread(
     int client, const ChannelId &channel, const BoardId &board, const ThreadId &thread,
-    bool flush, uint32_t offset, uint32_t limit)
+    bool flush)
 {
     {
         std::lock_guard<std::mutex> cache_guard(m_thread_cache_mutex);
         auto cached_thread = m_thread_cache.find({client, channel, board, thread});
         if (!flush && cached_thread != m_thread_cache.end())
         {
-            auto& posts = cached_thread->second;
-            std::vector<class Post> result;
-            if (offset < posts.size())
-            {
-                auto end = limit + offset < posts.size() ? posts.begin() + limit + offset : posts.end();
-                result.insert(result.end(), posts.begin() + offset, end);
-            }
-            return GetThreadResult(CallbackStatus::ok, std::move(result), posts.size());
+            return GetThreadResult(CallbackStatus::ok, &cached_thread->second, cached_thread->second.size());
         }
     }
 
     const ChannelPtr& ch = get_channel(channel);
     if (ch == nullptr)
     {
-        return GetThreadResult(CallbackStatus::unknown_resource, std::vector<class Post>(), 0);
+        return GetThreadResult(CallbackStatus::unknown_resource, nullptr, 0);
     }
 
     auto res = ch->get_thread(client, board, thread);
@@ -265,16 +249,14 @@ GetThreadResult ChannelHub::get_thread(
     {
         {
             std::lock_guard<std::mutex> cache_guard(m_thread_cache_mutex);
-            m_thread_cache[{client, channel, board, thread}] = res.posts;
+            m_thread_cache[{client, channel, board, thread}] = std::move(res.posts);
         }
 
-        std::vector<class Post> result;
-        auto end = limit + offset < res.posts.size() ? res.posts.begin() + limit + offset : res.posts.end();
-        result.insert(result.end(), res.posts.begin() + offset, end);
-        return GetThreadResult(CallbackStatus::ok, std::move(result), res.posts.size());
+        auto rr = m_thread_cache.find({client, channel, board, thread});
+        return GetThreadResult(CallbackStatus::ok, &rr->second, rr->second.size());
     }
     else
     {
-        return res;
+        return GetThreadResult(res.status);
     }
 }
