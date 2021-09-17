@@ -1,5 +1,6 @@
 #include "post.h"
 #include "hub.h"
+#include <vector>
 
 ChannelObject* Post::write() const
 {
@@ -17,8 +18,11 @@ ChannelObject* Post::write() const
     declare_arg_property_on_stack(replies_, 'r', replies_count, &comment_);
 
     ChannelStackObjectProperty* last = &replies_;
-    ChannelStackObjectProperty extra_props[attachments.size()];
-    uint16_t extra_ids[attachments.size()];
+    std::vector<ChannelStackObjectProperty> extra_props;
+    extra_props.resize(attachments.size());
+    std::vector<uint16_t> extra_ids;
+    extra_ids.resize(attachments.size());
+
     for (size_t i = 0, t = attachments.size(); i < t; i++)
     {
         extra_props[i].key = 'a';
