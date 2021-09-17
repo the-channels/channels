@@ -122,13 +122,17 @@ server.
 ```c
 -> [{
     OBJ_PROPERTY_ID "api"
+    'k' "<key>" (optional)
 }]
 <- [{
     OBJ_PROPERTY_ID "<api-version>"
 }]
 ```
 
-* `<api-version>`: The version of the API, currently `3`
+* `<api-version>`: The version of the API, currently `5`
+* If key (`k`) is specified, it will be then used to store client's settings. 
+  Future sessions with same key will share same settings. A MAC address (6 bytes)
+  is usually used as a key.
 
 ## Get Channels
 
@@ -167,6 +171,10 @@ Each board MUST have `OBJ_PROPERTY_ID` and `OBJ_PROPERTY_TITLE` attributes.
 }]
 <- [page_info, thread_a, thread_b, thread_c, ...]
 ```
+Optional request attributes:
+* `o`/`l` select a subset `[offset, offset+limit]` of threads
+* `f` when defined, the connection-only cache is flushed. Take care
+  with defining that while also defining offsets.
 
 `page_info` object COULD have a `c` property with number of threads and COULD be empty.
 
@@ -175,9 +183,7 @@ Each `thread_*` object MUST have `OBJ_PROPERTY_ID` (thread id) attribute.
 Optional attributes:
 * `OBJ_PROPERTY_TITLE`
 * `OBJ_PROPERTY_COMMENT`
-* `a` for author
-* `w` (uint16_t) for width of an attachment
-* `h` (uint16_t) for width of an attachment
+* `a` (uint16_t) for attachment image. Could be several.
 
 ## Get Thread
 
@@ -187,6 +193,7 @@ Optional attributes:
     'c' "<channel>"
     'b' "<board>"
     't' "<thread>"
+    'r' "<replies_to>" (optional)
     'o' uint16_t offset (optional)
     'l' uint16_t limit (optional, default 128)
     'f' uint8_t flush_cache (optional, default 0)
@@ -194,16 +201,20 @@ Optional attributes:
 <- [thead_info, post_a, post_b, post_c, ...]
 ```
 
+Optional request attributes:
+* `o`/`l` select a subset `[offset, offset+limit]` of posts
+* `r` get posts that reply only to a specific post. offsets/limits above still apply
+* `f` when defined, the connection-only cache is flushed. Take care
+  with defining that while also defining offsets.
+
 `thread_info` object COULD have `c` property with number of posts and COULD be empty.
 
 Each `post_*` object MUST have `OBJ_PROPERTY_ID` (post id) attribute. 
 
-Optional attributes:
+Optional response entry attributes:
 * `OBJ_PROPERTY_TITLE`
 * `OBJ_PROPERTY_COMMENT`
-* `a` for author
-* `w` (uint16_t) for width of an attachment
-* `h` (uint16_t) for width of an attachment
+* `a` (uint16_t) for attachment image. Could be several.
 
 ## Get Attachment Image
 
@@ -211,10 +222,7 @@ Optional attributes:
 -> [{
     OBJ_PROPERTY_ID "image"
     'c' "<channel>"
-    'b' "<board>"
-    't' "<thread>"
-    'p' "<post>"
-    'e' "<encoding>"
+    'i' uint16_t image_id
     'w' uint16_t target_width
     'h' uint16_t target_height
 }]
@@ -240,3 +248,24 @@ Following that object, an unspecified amount of objects with raw image data SHOU
 Each data object SHOULD have `OBJ_PROPERTY_PAYLOAD` property with chunk's payload.
 A total combined payload sizes of these objects SHOULD match the image raw data size as advertised in `s` property.
 Each chunk's payload size SHOULD NOT be greater than 1024.
+
+## Get Channel Settings Definitions
+
+```c
+-> [{
+    OBJ_PROPERTY_ID "setting_defs"
+    'c' "<channel>"
+}]
+<- [def_a, def_b, def_c, ...]
+```
+
+This call should allow a client to obtain a list of settings that channels supports.
+
+Each setting SHOULD contain the following:
+
+| Property        | Description |
+|-----------------|-------------|
+| OBJ_PROPERTY_ID | Setting ID |
+| OBJ_PROPERTY_TITLE | Setting description |
+| `t`             | Setting type (e.g. `string`, `bool` or `int`) |
+

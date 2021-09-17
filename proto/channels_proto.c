@@ -26,7 +26,6 @@
 #ifdef CHANNELS_PROTO_CLIENT
 static int client_socket = 0;
 static disconnected_callback_f client_disconnected = NULL;
-static struct proto_process_t client_proto = {};
 #endif
 
 #ifdef CHANNELS_PROTO_SERVER
@@ -162,7 +161,8 @@ static uint8_t process(int socket, struct proto_process_t* proto,
                     {
                         uint8_t object_buffer[128];
                         ChannelObject* obj = (ChannelObject*)object_buffer;
-                        channel_object_read(obj, 128, proto->recv_object_size, data);
+                        uint8_t res = channel_object_read(obj, 128, proto->recv_object_size, data);
+                        proto_assert_str(res == 0, "Header overrun");
                         next(socket, obj, proto->user);
                     }
 
@@ -173,8 +173,7 @@ static uint8_t process(int socket, struct proto_process_t* proto,
                     if (proto->recv_consumed >= proto->recv_size)
                     {
                         proto_assert_str(proto->recv_objects_num, "Empty response");
-                        proto_assert(proto->recv_consumed == proto->recv_size, "Overconsumed: %d out of %d",
-                            proto->recv_consumed, proto->recv_size);
+                        proto_assert_str(proto->recv_consumed == proto->recv_size, "Overconsumed");
 
                         const char* err = complete_request(socket, proto, proto->user);
 
@@ -256,14 +255,15 @@ static int recv_process(int socket, struct proto_process_t* proto,
 
 #ifdef CHANNELS_PROTO_CLIENT
 
-void channels_proto_client_process(proto_start_request_callback_f start_request,
+void channels_proto_client_process(struct proto_process_t* proto,
+    proto_start_request_callback_f start_request,
     proto_next_object_callback_f next,
     proto_complete_request_callback_f complete_request)
 {
     int polled = poll_fd(client_socket);
     if (polled & POLLIN)
     {
-        if (recv_process(client_socket, &client_proto, start_request, next, complete_request) < 0)
+        if (recv_process(client_socket, proto, start_request, next, complete_request) < 0)
         {
             sockclose(client_socket);
             client_disconnected();

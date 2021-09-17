@@ -4,10 +4,10 @@
 #include <string.h>
 #include <stdio.h>
 
-extern int netlog_init(const char* reporting_address, int port);
-extern void netlog_str(const char *data);
-extern char* netlog_buffer;
-
-#define netlog(fmt, ...) sprintf(netlog_buffer, fmt, __VA_ARGS__); netlog_str(netlog_buffer)
+extern int netlog_init(int port);
+extern void netlog(const char *data);
+extern void netlog_1(const char *a);
+extern void netlog_2(const char *a, const char *b);
+extern void netlog_3(const char *a, const char *b, const char *c);
 
 #endif

@@ -1,9 +1,8 @@
 #include <string.h>
 #include "zxgui.h"
-#include "zxgui_internal.h"
-#include "system.h"
+#include <spectrum.h>
 
-static void image_render(uint8_t x, uint8_t y, struct gui_image_t* this, struct gui_scene_t* scene)
+void _image_render(uint8_t x, uint8_t y, struct gui_image_t* this, struct gui_scene_t* scene)
 {
     x += this->x;
     y += this->y;
@@ -14,21 +13,17 @@ static void image_render(uint8_t x, uint8_t y, struct gui_image_t* this, struct 
     }
 }
 
-void zxgui_image_init(struct gui_image_t* image, uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* source, const uint8_t* colors)
+void zxgui_image_init(struct gui_image_t* image, xywh_t xywh,
+    const uint8_t* source, const uint8_t* colors) ZXGUI_CDECL
 {
-    image->render = (gui_render_f)image_render;
-    image->event = NULL;
+    zxgui_base_init(image, xywh, _image_render, NULL);
+
     image->flags = GUI_FLAG_DIRTY;
-    image->next = NULL;
     image->source = source;
     image->colors = colors;
-    image->x = x;
-    image->y = y;
-    image->w = w;
-    image->h = h;
 }
 
-static void dynamic_image_render(uint8_t x, uint8_t y, struct gui_dynamic_image_t* this, struct gui_scene_t* scene)
+void _dynamic_image_render(uint8_t x, uint8_t y, struct gui_dynamic_image_t* this, struct gui_scene_t* scene)
 {
     x += this->x;
     y += this->y;
@@ -94,23 +89,15 @@ static void dynamic_image_render(uint8_t x, uint8_t y, struct gui_dynamic_image_
                 }
             }
         }
-
-        this->release_data(this);
     }
 }
 
-void zxgui_dynamic_image_init(struct gui_dynamic_image_t* image, uint8_t x, uint8_t y, uint8_t w, uint8_t h,
-    gui_label_obtain_image_f obtain_data, gui_label_release_image_f release_data, void* user)
+void zxgui_dynamic_image_init(struct gui_dynamic_image_t* image, xywh_t xywh,
+    gui_label_obtain_image_f obtain_data, void* user) ZXGUI_CDECL
 {
-    image->render = (gui_render_f)dynamic_image_render;
-    image->event = NULL;
+    zxgui_base_init(image, xywh, _dynamic_image_render, NULL);
+
     image->flags = GUI_FLAG_DIRTY;
-    image->next = NULL;
-    image->x = x;
-    image->y = y;
-    image->w = w;
-    image->h = h;
     image->obtain_data = obtain_data;
-    image->release_data = release_data;
     image->user = user;
 }

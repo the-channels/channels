@@ -1,14 +1,13 @@
-from channels.base import Channel, ChannelsError, ChannelBoard, ChannelThread, ChannelPost
+from channels.base import Channel, ChannelsError, ChannelAttachment, ChannelBoard, ChannelThread
+from channels.base import ChannelPost, SettingDefinition
 
 import requests
-import os
 import re
 
 
 class FourChanChannel(Channel):
     base_url = "https://a.4cdn.org"
     attachment_url = "https://i.4cdn.org"
-    tag_pattern = re.compile(r'<.*?>', re.MULTILINE)
     post_reply_pattern = re.compile(r'>>([0-9]+)', re.MULTILINE)
 
     def __init__(self):
@@ -17,28 +16,10 @@ class FourChanChannel(Channel):
     def name(self):
         return "4chan"
 
-    @staticmethod
-    def __strip__html__(s: str):
-        s = s.replace("<br>", "\n")
-        s = re.sub(FourChanChannel.tag_pattern, '', s)
-        s = s.replace("&#039;", "'")
-        s = s.replace("&quot;", "\"")
-        s = s.replace("&amp;", "&")
-        s = s.replace("&gt;", ">")
-        s = s.replace("&lt;", "<")
-        return s
-
-    def get_attachment(self, client, board, thread, post, attachment, width, height):
-        attachment_path = self.get_cache_key(board + "_" + attachment)
-        if os.path.isfile(attachment_path):
-            return attachment_path
-
-        r = requests.get(FourChanChannel.attachment_url + "/" + board + "/" + attachment)
-        if r.status_code != 200:
-            raise ChannelsError(ChannelsError.UNKNOWN_ERROR)
-        with open(attachment_path, mode='wb') as f:
-            f.write(r.content)
-        return attachment_path
+    def get_setting_definitions(self, client):
+        return [
+            # SettingDefinition("pass", "Pass code for posting"),
+        ]
 
     def get_boards(self, client, limit):
         r = requests.get(FourChanChannel.base_url + "/boards.json")
@@ -69,11 +50,10 @@ class FourChanChannel(Channel):
                 if "sub" in thread:
                     result_thread.title = thread["sub"]
                 result_thread.num_replies = thread["replies"] if "replies" in thread else 0
-                if ("tim" in thread) and ("ext" in thread) and ("w" in thread) and ("h" in thread):
-                    result_thread.attachment = str(thread["tim"]) + thread["ext"]
-                    result_thread.attachment_width = thread["w"]
-                    result_thread.attachment_height = thread["h"]
-                result_thread.comment = FourChanChannel.__strip__html__(thread["com"])
+                if ("tim" in thread) and ("ext" in thread):
+                    url = FourChanChannel.attachment_url + "/" + board + "/" + str(thread["tim"]) + thread["ext"]
+                    result_thread.attachments.append(ChannelAttachment(url))
+                result_thread.comment = Channel.strip_html(thread["com"])
                 threads.append(result_thread)
 
         return threads
@@ -94,11 +74,10 @@ class FourChanChannel(Channel):
             result_post = ChannelPost(str(post["no"]))
             if "sub" in post:
                 result_post.title = post["sub"]
-            if ("tim" in post) and ("ext" in post) and ("w" in post) and ("h" in post):
-                result_post.attachment = str(post["tim"]) + post["ext"]
-                result_post.attachment_width = post["w"]
-                result_post.attachment_height = post["h"]
-            result_post.comment = FourChanChannel.__strip__html__(post["com"])
+            if ("tim" in post) and ("ext" in post):
+                url = FourChanChannel.attachment_url + "/" + board + "/" + str(post["tim"]) + post["ext"]
+                result_post.attachments.append(ChannelAttachment(url))
+            result_post.comment = Channel.strip_html(post["com"])
 
             for reply in re.finditer(FourChanChannel.post_reply_pattern, result_post.comment):
                 reply_to = reply.group(1)

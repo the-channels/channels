@@ -1,7 +1,9 @@
 #include <sstream>
 #include "socket_hub.h"
 #include "proto_objects.h"
+#include "setting_def.h"
 #include "channels_proto.h"
+
 #ifdef WIN32
 #include <Winsock2.h>
 #else
@@ -13,7 +15,7 @@
 #include <set>
 #include <functional>
 
-static const std::string protocol_version = "3";
+static const std::string protocol_version = "5";
 
 static std::string get_string_property(ChannelObject* o, uint8_t key)
 {
@@ -30,9 +32,15 @@ static std::string get_string_property(ChannelObject* o, uint8_t key)
 SocketChannelHub::SocketChannelHub(uint16_t port) :
     ChannelHub(), m_port(port)
 {
-    m_handlers.emplace("api", [](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
+    m_handlers.emplace("api", [this](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
         -> const char*
     {
+        if (amount > 0)
+        {
+            std::string key = get_string_property(*objects, 'k');
+            set_key(client, key);
+        }
+
         declare_str_property_on_stack(id_, OBJ_PROPERTY_ID, protocol_version.c_str(), nullptr);
 
         result.push_back(channel_object_allocate(&id_));
@@ -77,6 +85,91 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
         for (auto& board: res.second)
         {
             result.push_back(board.write());
+        }
+
+        return nullptr;
+    });
+
+    m_handlers.emplace("setting_defs", [](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
+        -> const char*
+    {
+        if (amount == 0)
+        {
+            return "channel is not specified";
+        }
+
+        ChannelObject* channel_object = objects[0];
+
+        ChannelId channel = get_string_property(channel_object, 'c');
+        if (channel.empty())
+        {
+            return "Missing channel";
+        }
+
+        auto res = Get()->get_setting_defs(client, channel);
+
+        if (res.first != CallbackStatus::ok)
+        {
+            return "Cannot obtain setting definitions";
+        }
+
+        {
+            declare_str_property_on_stack(id_, OBJ_PROPERTY_ID, "OK", nullptr);
+            result.push_back(channel_object_allocate(&id_));
+        }
+
+        for (auto& def: res.second)
+        {
+            result.push_back(def.write());
+        }
+
+        return nullptr;
+    });
+
+    m_handlers.emplace("save_settings", [](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
+    -> const char*
+    {
+        if (amount == 0)
+        {
+            return "channel is not specified";
+        }
+
+        ChannelObject* channel_object = objects[0];
+
+        ChannelId channel = get_string_property(channel_object, 'c');
+        if (channel.empty())
+        {
+            return "Missing channel";
+        }
+
+        std::unordered_map<std::string, std::string> update_settings;
+
+        auto props = channel_object->properties;
+        while (*props)
+        {
+            if ((*props)->key == OBJ_PROPERTY_PAYLOAD)
+            {
+                std::string v((*props)->value, (*props)->value_size);
+                auto npos = v.find('=');
+                if (npos != std::string::npos)
+                {
+                    std::string key = v.substr(0, npos);
+                    std::string value = v.substr(npos + 1);
+                    if (!key.empty())
+                    {
+                        update_settings[key] = value;
+                    }
+                }
+            }
+
+            props++;
+        }
+
+        Get()->set_settings(client, channel, update_settings);
+
+        {
+            declare_str_property_on_stack(id_, OBJ_PROPERTY_ID, "OK", nullptr);
+            result.push_back(channel_object_allocate(&id_));
         }
 
         return nullptr;
@@ -151,22 +244,10 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
             return "Missing channel";
         }
 
-        BoardId board = get_string_property(channel_object, 'b');
-        if (board.empty())
+        uint16_t image_id = get_uint16_property(channel_object, 'i', 0);
+        if (image_id == 0)
         {
-            return "Missing board";
-        }
-
-        ThreadId thread = get_string_property(channel_object, 't');
-        if (thread.empty())
-        {
-            return "Missing thread";
-        }
-
-        PostId post = get_string_property(channel_object, 'p');
-        if (post.empty())
-        {
-            return "Missing post";
+            return "Missing image_id";
         }
 
         std::string encoding_name = get_string_property(channel_object, 'e');
@@ -193,7 +274,7 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
             return "Unknown encoding";
         }
 
-        auto res = Get()->get_image(client, channel, board, thread, post, target_w, target_h, encoding);
+        auto res = Get()->get_image(client, channel, image_id, target_w, target_h, encoding);
 
         if (res.status != CallbackStatus::ok || res.data == nullptr)
         {

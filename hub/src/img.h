@@ -50,13 +50,13 @@ public:
     ImageProcessing();
     ~ImageProcessing();
     GetImageResult reencode_image(const std::string& source_file,
-        uint32_t source_w, uint32_t source_h,
         uint32_t target_w, uint32_t target_h,
         ImageEncoding encoding);
 
 private:
     Device* obtain_encoding_device(ImageEncoding encoding,
-        float image_scale, bool linear_order, uint16_t target_w, uint16_t target_h);
+        bool linear_order, uint16_t target_w, uint16_t target_h);
+    void set_encoding_device(ImageEncoding encoding, float image_scale);
 
 private:
     Device* m_color_zx;

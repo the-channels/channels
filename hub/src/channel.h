@@ -3,6 +3,7 @@
 
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <memory>
 #include "board.h"
@@ -16,13 +17,14 @@ typedef std::unique_ptr<class Channel> ChannelPtr;
 class Channel
 {
 public:
-    virtual CallbackStatus get_attachment(int client, const BoardId &board, const ThreadId &thread, const PostId &post,
-        const std::string& attachment, uint32_t width, uint32_t height,
-        std::string& fout) = 0;
+    virtual CallbackStatus get_attachment(int client, const std::string& url, std::string& fout) = 0;
     virtual GetChannelBoardsResult get_boards(int client, uint32_t limit) = 0;
+    virtual GetSettingDefsResult get_setting_defs(int client) = 0;
+    virtual void set_settings(int client, const std::unordered_map<std::string, std::string>& s) = 0;
     virtual GetChannelThreadsResult get_threads(int client, const BoardId &board) = 0;
     virtual GetChannelThreadResult get_thread(int client, const BoardId &board, const ThreadId &thread) = 0;
     virtual void new_client(int client) {}
+    virtual void set_key(int client, const std::string& key) {}
     virtual void client_released(int client) {}
 
     const std::string& get_name() const { return m_name; }

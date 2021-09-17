@@ -1,8 +1,6 @@
 #include "zxgui.h"
-#include "zxgui_internal.h"
-#include "system.h"
-
-static struct gui_scene_t* current_scene = NULL;
+#include <spectrum.h>
+#include <input.h>
 
 enum input_state_t
 {
@@ -10,6 +8,7 @@ enum input_state_t
     key_pressed
 };
 
+static struct gui_scene_t* current_scene = NULL;
 static enum input_state_t input_state = waiting;
 static int debounce_counter = 0;
 
@@ -32,9 +31,10 @@ void zxgui_scene_init(struct gui_scene_t* scene, gui_scene_update_f update)
     scene->child = NULL;
     scene->focus = NULL;
     scene->update = update;
+    scene->key_pressed = NULL;
 }
 
-void zxgui_scene_add(struct gui_scene_t* scene, void* object)
+void zxgui_scene_add(struct gui_scene_t* scene, void* object) __z88dk_callee
 {
     struct gui_object_t* last = zxgui_scene_get_last_object(scene);
     struct gui_object_t* o = (struct gui_object_t*)object;
@@ -61,11 +61,6 @@ static void scene_render()
 
 void zxgui_scene_set(struct gui_scene_t* scene)
 {
-    if (current_scene)
-    {
-        zxgui_scene_dispatch_event(current_scene, GUI_EVENT_CHANGED_SCENE, NULL);
-    }
-
     zx_colour(BRIGHT | INK_GREEN | PAPER_BLACK);
     zx_cls();
     current_scene = scene;
@@ -80,12 +75,12 @@ void zxgui_scene_set(struct gui_scene_t* scene)
     scene_render();
 }
 
-void zxgui_scene_set_focus(struct gui_scene_t* scene, void* object)
+void zxgui_scene_set_focus(struct gui_scene_t* scene, void* object) __z88dk_callee
 {
     scene->focus = object;
 }
 
-uint8_t zxgui_scene_dispatch_event(struct gui_scene_t* scene, enum gui_event_type event_type, void* event)
+uint8_t zxgui_scene_dispatch_event(struct gui_scene_t* scene, enum gui_event_type event_type, void* event) __z88dk_callee
 {
     struct gui_object_t* child = current_scene->child;
     while (child)
@@ -109,14 +104,18 @@ static void update_keyboard()
     {
         case waiting:
         {
-            int key = in_inkey();
+            int key = in_Inkey();
             if (key)
             {
-                //netlog("key: %d\n", key);
-
                 struct gui_event_key_pressed e;
                 e.key = key;
-                zxgui_scene_dispatch_event(current_scene, GUI_EVENT_KEY_PRESSED, &e);
+                if (zxgui_scene_dispatch_event(current_scene, GUI_EVENT_KEY_PRESSED, &e) == 0)
+                {
+                    if (current_scene->key_pressed)
+                    {
+                        current_scene->key_pressed(key);
+                    }
+                }
 
                 input_state = key_pressed;
                 debounce_counter = 10;
@@ -129,14 +128,14 @@ static void update_keyboard()
             {
                 debounce_counter--;
 
-                if (in_inkey())
+                if (in_Inkey())
                 {
                     debounce_counter = 10;
                 }
             }
             else
             {
-                if (in_inkey() == 0)
+                if (in_Inkey() == 0)
                 {
                     input_state = waiting;
                 }
@@ -146,7 +145,7 @@ static void update_keyboard()
     }
 }
 
-void zxgui_scene_iteration()
+void zxgui_scene_iteration(void)
 {
     scene_render();
 

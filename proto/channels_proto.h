@@ -39,6 +39,7 @@ typedef const char* (*proto_complete_request_callback_f)(int socket, struct prot
 extern int channels_proto_connect(const char* host, int port, disconnected_callback_f disconnected);
 extern void channels_proto_disconnect();
 extern void channels_proto_client_process(
+    struct proto_process_t* proto,
     proto_start_request_callback_f start_request,
     proto_next_object_callback_f next,
     proto_complete_request_callback_f complete_request);

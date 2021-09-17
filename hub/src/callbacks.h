@@ -11,6 +11,7 @@ enum class CallbackStatus
     unknown_resource
 };
 
+typedef std::pair<CallbackStatus, std::vector<class SettingDef>> GetSettingDefsResult;
 typedef std::pair<CallbackStatus, std::vector<class Board>> GetBoardsResult;
 typedef std::pair<CallbackStatus, std::vector<class Board>> GetChannelBoardsResult;
 

@@ -2,11 +2,10 @@
 #include <stdint.h>
 
 #include "zxgui.h"
-#include "zxgui_internal.h"
-#include <font/fzx.h>
-#include "system.h"
+#include <spectrum.h>
+#include <fzx_ui.h>
 
-static void form_render(uint8_t x, uint8_t y, struct gui_form_t* this, struct gui_scene_t* scene)
+static void _form_render(uint8_t x, uint8_t y, struct gui_form_t* this, struct gui_scene_t* scene)
 {
     x += this->x;
     y += this->y;
@@ -50,12 +49,10 @@ static void form_render(uint8_t x, uint8_t y, struct gui_form_t* this, struct gu
 
         zxgui_screen_color(f);
         zxgui_screen_clear(x + 1, y + 1, this->w - 1, 1);
-        font_state.fgnd_attr = f;
 
-        int16_t title_offset = ((this->w + 1) * 8 - fzx_string_extent(font_state.font, (char*)this->title)) / 2;
-
-        fzx_at(&font_state, x * 8 + title_offset, (y + 1) * 8 + 1);
-        fzx_puts(&font_state, (char*)this->title);
+        int16_t title_offset = ((this->w + 1) * 8 - fzx_ui_string_extent((char*)this->title)) / 2;
+        fzx_ui_color(f);
+        fzx_ui_puts_at(x * 8 + title_offset, (y + 1) * 8 + 1, this->title);
     }
 
     x += 1;
@@ -69,17 +66,16 @@ static void form_render(uint8_t x, uint8_t y, struct gui_form_t* this, struct gu
     }
 }
 
-static uint8_t form_event(enum gui_event_type event_type, void* event, struct gui_form_t* this, struct gui_scene_t* scene)
+static uint8_t _form_event(enum gui_event_type event_type, void* event, struct gui_form_t* this, struct gui_scene_t* scene)
 {
     struct gui_object_t* child = this->child;
     while (child)
     {
         if (child->event)
         {
-            uint8_t caught = child->event(event_type, event, child, scene);
-            if (caught)
+            if (child->event(event_type, event, child, scene))
             {
-                return caught;
+                return 1;
             }
         }
         child = child->next;
@@ -87,22 +83,18 @@ static uint8_t form_event(enum gui_event_type event_type, void* event, struct gu
     return 0;
 }
 
-void zxgui_form_init(struct gui_form_t* form, uint8_t x, uint8_t y, uint8_t w, uint8_t h, const char* title, uint8_t style)
+void zxgui_form_init(struct gui_form_t* form, xywh_t xywh,
+    const char* title, uint8_t style) ZXGUI_CDECL
 {
-    form->render = (gui_render_f)form_render;
-    form->event = (gui_event_f)form_event;
+    zxgui_base_init(form, xywh, _form_render, _form_event);
+
     form->flags = GUI_FLAG_DIRTY;
     form->child = NULL;
-    form->next = NULL;
     form->title = title;
     form->style = style;
-    form->x = x;
-    form->y = y;
-    form->w = w;
-    form->h = h;
 }
 
-void zxgui_form_add_child(struct gui_form_t* form, void* child)
+void zxgui_form_add_child(struct gui_form_t* form, void* child) ZXGUI_CDECL
 {
     if (form->child == NULL)
     {

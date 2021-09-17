@@ -16,3 +16,9 @@ deployment.xml
 /hub/channels/*.egg-info
 /hub/channels/dist
 .idea
+*.map
+*.map.sorted
+*.module
+*.module.orig
+ethup
+/client/.ticks_history.txt

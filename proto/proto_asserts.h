@@ -8,8 +8,8 @@
 #ifdef __SPECTRUM
 #include "netlog.h"
 #include <spectrum.h>
-#define proto_assert_str(cond, msg) if (!(cond)) { netlog(msg " at %s:%d\n", __FILE__, __LINE__); while(1) { zx_border(INK_RED); zx_border(INK_BLACK);  } }
-#define proto_assert(cond, msg, ...) if (!(cond)) { netlog(msg " at %s:%d\n", __VA_ARGS__, __FILE__, __LINE__); while(1) { zx_border(INK_RED); zx_border(INK_BLACK);  } }
+extern void proto_abort();
+#define proto_assert_str(cond, msg) if (!(cond)) { netlog_1(msg " at " __FILE__); proto_abort(); }
 #else
 #include <assert.h>
 #include <stdio.h>

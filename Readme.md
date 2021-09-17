@@ -1,6 +1,6 @@
 ![image](https://user-images.githubusercontent.com/1666014/126013799-b499d24f-88e2-42b0-8d3d-c77991c4f9ac.png)
 
-ZX Spectrum client for imageboards.
+ZX Spectrum browser for forums and imageboards.
 
 https://user-images.githubusercontent.com/1666014/126671608-02e74708-55c7-4141-b330-0c9b010e1c9d.mov
 
@@ -10,13 +10,13 @@ You can do that from the [Releases](https://github.com/the-channels/channels/rel
 
 ## Requirements
 * Because speccy does not support any internet connectivity by default, you'll need [Spectranet Cartridge](https://www.bytedelight.com/?page_id=3515). It may be pricey and hard to get, but please support the manufacturer as it's a very Niche product.
-* [Fuse Enumator](http://fuse-emulator.sourceforge.net/) supports such cartrige, you'll just need to enable it via "Peripherials->Spectranet" radio button
+* [Fuse Emulator](http://fuse-emulator.sourceforge.net/) supports such cartrige, you'll just need to enable it via "Peripherials->Spectranet" radio button
 
 ## To Do List
 1. ~~Refactor img2spec tool and split display and processing logic in separate static
    library with no executable~~
-2. Ability to save settings
-3. Tracking and showing replies to particular post
+2. ~~Ability to save settings~~
+3. ~~Tracking and showing replies to particular post~~
 4. Posting
 5. Optimize font rendering speed
 6. Cleanup cache after certain timeout
@@ -32,7 +32,9 @@ A special proxy called Hub (`hub/` folder) is supposed to be run somewhere on yo
 
 ### How channels work?
 
-Despite being written in C++, the Hub uses Python to convert channel specifics into
+Want to see your favorite website with this browser? Refer to [Creating A New Channel](NewChannel.md).
+
+The Hub uses Python to convert channel specifics into
 a standardized form.
 
 ![channels](https://user-images.githubusercontent.com/1666014/127716547-670110c4-4c16-47a9-8a72-954963ec54fc.png)
@@ -41,7 +43,7 @@ Logic blocks marked here in green are Python packages.
 The hub simply scans installed packages that match and loads them up.
 
 Some packaged are distributed with the hub, but other could be insalled into the sytem,
-and the Hub would detect it. To read on how to write a new channel, refer to [Creating A New Channel](NewChannel.md).
+and the Hub would detect it. 
 
 ## Channels Proto
 A client and the hub communicate via a special protocol, as described in [this document](./proto/Readme.md).
@@ -74,16 +76,16 @@ sudo apt-get install -y \
 Proceed with cmake as usual.
 
 ##### Docker
-It is also available as a [docker image](https://hub.docker.com/repository/docker/desertkun/channels-hub):
+It is also available as a [docker image](https://hub.docker.com/r/desertkun/channels-hub):
 ```bash
-docker run -d --tmpfs /channels/hub/bin/cache -p 9493:9493 -it desertkun/channels-hub:latest
+docker run -d --tmpfs /channels/hub/bin/cache -p 9493:9493 -p 16384:16384/udp -it desertkun/channels-hub:latest
 ```
 You can build a local image if you want:
 ```bash
 # build
-docker build -t channel_hub -f Dockerfile.hub .
+docker build -t channel_hub .
 # run
-docker run -d --tmpfs /channels/hub/bin/cache -p 9493:9493 -it channel_hub
+docker run -d --tmpfs /channels/hub/bin/cache -p 9493:9493 -p 16384:16384/udp -it channel_hub
 ```
 
 ## Debugging

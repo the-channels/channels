@@ -11,6 +11,12 @@ for line in fileinput.input():
     entry_ = entry_.strip()
     if entry_.startswith("i_"):
         continue
+    if entry_.startswith("__C_LINE"):
+        continue
+    if entry_.startswith("__ASM_LINE"):
+        continue
+    if entry_.startswith("__CDB_INFO"):
+        continue
 
     if head == 0:
         if entry_ == "start":
@@ -28,14 +34,19 @@ for line in fileinput.input():
         last_size = size_
         continue
 
-    if diff >= 64:
+    if diff >= 16:
         entries.append((last_item, diff))
         sum += diff
 
     last_size = size_
     last_item = entry_
 
+l_total = 0
+
 for key, value in sorted(entries, key=lambda x: x[1], reverse=True):
+    if key and not key.startswith("_"):
+        l_total += value
     print("{0}: {1}".format(key, value))
 
+print("L: {0}".format(l_total))
 print("Sum: {0}".format(sum))

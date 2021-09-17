@@ -1,4 +1,5 @@
 #include "python_channel.h"
+#include "setting_def.h"
 #include <iostream>
 
 PythonChannel::PythonChannel(const std::string& id, const std::string& title, const py::object& clazz) :
@@ -11,18 +12,13 @@ PythonChannel::PythonChannel(const std::string& id, const std::string& title, co
     m_client_class = getattr(py::module_::import("channels.base"), "Client");
 }
 
-CallbackStatus PythonChannel::get_attachment(
-    int client, const BoardId &board, const ThreadId &thread, const PostId &post,
-    const std::string& attachment, uint32_t width, uint32_t height,
-    std::string& fout)
+CallbackStatus PythonChannel::get_attachment(int client, const std::string& url, std::string& fout)
 {
     py::gil_scoped_acquire acquire;
 
     try
     {
-        auto res = m_instance.attr("get_attachment")(m_client_settings[client], board, thread, post,
-            attachment, width, height);
-
+        auto res = m_instance.attr("get_attachment")(m_client_settings[client], url);
         fout = py::cast<std::string>(res);
         return CallbackStatus(CallbackStatus::ok);
     }
@@ -64,6 +60,52 @@ GetChannelBoardsResult PythonChannel::get_boards(int client, uint32_t limit)
     }
 }
 
+GetSettingDefsResult PythonChannel::get_setting_defs(int client)
+{
+    py::gil_scoped_acquire acquire;
+
+    try
+    {
+        auto res = m_instance.attr("get_setting_definitions")(m_client_settings[client]);
+        std::vector<SettingDef> defs;
+        for (auto& entry: py::list(res))
+        {
+            SettingDef def;
+            def.id = py::cast<std::string>(py::getattr(entry, "id"));
+            def.description = py::cast<std::string>(py::getattr(entry, "description"));
+            def.current_value = py::cast<std::string>(py::getattr(m_client_settings[client], "get_option")(def.id));
+            defs.push_back(def);
+        }
+        return GetSettingDefsResult(CallbackStatus::ok, std::move(defs));
+    }
+    catch (py::error_already_set &e)
+    {
+        std::cerr << e.what() << std::endl;
+        return GetSettingDefsResult(CallbackStatus::failed, std::vector<SettingDef>());
+    }
+}
+
+void PythonChannel::set_settings(int client, const std::unordered_map<std::string, std::string>& s)
+{
+    py::gil_scoped_acquire acquire;
+
+    try
+    {
+        auto sett = m_client_settings[client];
+
+        for (const auto& it: s)
+        {
+            sett.attr("set_option")(it.first, it.second);
+        }
+
+        sett.attr("save_options")();
+    }
+    catch (py::error_already_set &e)
+    {
+        std::cerr << e.what() << std::endl;
+    }
+}
+
 GetChannelThreadsResult PythonChannel::get_threads(int client, const BoardId &board)
 {
     py::gil_scoped_acquire acquire;
@@ -85,11 +127,15 @@ GetChannelThreadsResult PythonChannel::get_threads(int client, const BoardId &bo
             {
                 thread.comment = py::cast<std::string>(py::getattr(entry, "comment"));
             }
-            if (!py::isinstance<py::none>(py::getattr(entry, "attachment")))
+            if (!py::isinstance<py::none>(py::getattr(entry, "attachments")))
             {
-                thread.attachment = py::cast<std::string>(py::getattr(entry, "attachment"));
-                thread.attachment_width = py::cast<int>(py::getattr(entry, "attachment_width"));
-                thread.attachment_height = py::cast<int>(py::getattr(entry, "attachment_height"));
+                for (auto& att: py::list(py::getattr(entry, "attachments")))
+                {
+                    if (py::isinstance<py::none>(py::getattr(att, "url")))
+                        continue;
+
+                    thread.attachments.emplace_back(py::cast<std::string>(py::getattr(att, "url")));
+                }
             }
             if (py::isinstance<py::int_>(py::getattr(entry, "num_replies")))
             {
@@ -128,11 +174,15 @@ GetChannelThreadResult PythonChannel::get_thread(int client, const BoardId &boar
             {
                 post.comment = py::cast<std::string>(py::getattr(entry, "comment"));
             }
-            if (!py::isinstance<py::none>(py::getattr(entry, "attachment")))
+            if (!py::isinstance<py::none>(py::getattr(entry, "attachments")))
             {
-                post.attachment = py::cast<std::string>(py::getattr(entry, "attachment"));
-                post.attachment_width = py::cast<int>(py::getattr(entry, "attachment_width"));
-                post.attachment_height = py::cast<int>(py::getattr(entry, "attachment_height"));
+                for (auto& att: py::list(py::getattr(entry, "attachments")))
+                {
+                    if (py::isinstance<py::none>(py::getattr(att, "url")))
+                        continue;
+
+                    post.attachments.emplace_back(py::cast<std::string>(py::getattr(att, "url")));
+                }
             }
             if (py::isinstance<py::list>(py::getattr(entry, "replies")))
             {
@@ -155,13 +205,33 @@ GetChannelThreadResult PythonChannel::get_thread(int client, const BoardId &boar
     }
 }
 
+void PythonChannel::set_key(int client, const std::string& key)
+{
+    py::gil_scoped_acquire acquire;
+    std::lock_guard<std::mutex> guard(m_client_settings_mutex);
+
+    auto it = m_client_settings.find(client);
+    if (it != m_client_settings.end())
+    {
+        try
+        {
+            py::getattr(it->second, "set_key")(py::bytes(key));
+        }
+        catch (py::error_already_set &e)
+        {
+            std::cerr << e.what() << std::endl;
+        }
+    }
+}
+
 void PythonChannel::new_client(int client)
 {
     py::gil_scoped_acquire acquire;
     std::lock_guard<std::mutex> guard(m_client_settings_mutex);
 
-    m_client_settings[client] = m_client_class(client);
+    m_client_settings[client] = m_client_class(get_name(), client);
 }
+
 void PythonChannel::client_released(int client)
 {
     py::gil_scoped_acquire acquire;

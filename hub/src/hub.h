@@ -2,6 +2,7 @@
 #define CHANNEL_HUB_HUB_H
 
 #include <unordered_map>
+#include <set>
 #include <mutex>
 #include <memory>
 #include "channel.h"
@@ -76,10 +77,13 @@ public:
 public:
     virtual int run() = 0;
 
-    GetImageResult get_image(int client, const ChannelId &channel, const BoardId &board,
-        const ThreadId& thread, const PostId &post,
+    uint16_t register_image(const std::string& url);
+    GetImageResult get_image(int client, const ChannelId &channel, uint16_t image_id,
         uint32_t target_w, uint32_t target_h,
         ImageProcessing::ImageEncoding encoding);
+
+    GetSettingDefsResult get_setting_defs(int client, const ChannelId &channel);
+    void set_settings(int client, const ChannelId &channel, const std::unordered_map<std::string, std::string>& s);
     GetBoardsResult get_boards(int client, const ChannelId &channel, uint32_t limit);
     GetThreadsResult get_threads(int client, const ChannelId &channel, const BoardId &board,
         bool flush);
@@ -88,6 +92,7 @@ public:
 
     void new_client(int client);
     void client_released(int client);
+    void set_key(int client, const std::string& key);
 
     const std::map<ChannelId, ChannelPtr>& get_channels() const { return m_channels; }
     void register_channel(const ChannelId& channel_id, Channel* ptr);
@@ -99,6 +104,10 @@ private:
     static ChannelHub* s_hub;
     static bool s_verbose;
     static bool s_debug;
+
+    std::unordered_map<std::string, uint16_t> m_images;
+    std::unordered_map<uint16_t, std::string> m_image_ids;
+    uint16_t m_next_image_id;
 
     CatalogCache m_catalog_cache;
     std::mutex m_catalog_cache_mutex;

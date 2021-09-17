@@ -13,7 +13,8 @@ typedef enum {
     OBJ_PROPERTY_ERROR          = 0x01,
     OBJ_PROPERTY_ID             = 0x02,
     OBJ_PROPERTY_TITLE          = 0x03,
-    OBJ_PROPERTY_COMMENT        = 0x04
+    OBJ_PROPERTY_COMMENT        = 0x04,
+    OBJ_PROPERTY_KEYVALUE       = 0x05
 } ChannelsObjectPropertyKey;
 
 #pragma pack(push)
@@ -119,13 +120,19 @@ extern void channel_object_assign(ChannelObject* obj, uint16_t buffer_available,
  * No allocations happen so obj could be on stack.
  * If object is required to be used past buffer_from lifetime, a copy has to be made
  */
-extern void channel_object_read(ChannelObject* obj, uint16_t buffer_available, uint16_t object_size, const uint8_t* buffer_from);
+extern uint8_t channel_object_read(ChannelObject* obj, uint16_t buffer_available, uint16_t object_size, const uint8_t* buffer_from);
 
 /*
  * Find a property by a given key. An object can contain multiple properties with the same key,
  * this function returns only the first match.
  */
 extern ChannelObjectProperty* find_property(ChannelObject* o, uint8_t key);
+
+/*
+ * Find a property by a given key whose value is also partially matches.
+ * An object can contain multiple properties with the same key, this function returns only the first match.
+ */
+extern ChannelObjectProperty* find_property_match(ChannelObject* o, uint8_t key, const char* match);
 
 /*
  * Get uint16_t property value by a given key. If no property has been found, the default value is returned.

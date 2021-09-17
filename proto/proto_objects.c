@@ -31,7 +31,7 @@ void channel_object_assign(ChannelObject* obj, uint16_t buffer_available, Channe
     }
 
     uint16_t offsets = sizeof(ChannelObject) + (number_of_properties + 1) * sizeof(ChannelObjectProperty*) + 2;
-    proto_assert(object_size + offsets <= buffer_available, "overrun %d out of %d", object_size + offsets, buffer_available);
+    proto_assert_str(object_size + offsets <= buffer_available, "overrun");
 
     uint8_t* raw_data = (uint8_t*)obj + offsets;
     obj->object_size = object_size;
@@ -57,7 +57,7 @@ void channel_object_assign(ChannelObject* obj, uint16_t buffer_available, Channe
     *res_prop = NULL;
 }
 
-void channel_object_read(ChannelObject* obj, uint16_t buffer_available, uint16_t object_size, const uint8_t* buffer_from)
+uint8_t channel_object_read(ChannelObject* obj, uint16_t buffer_available, uint16_t object_size, const uint8_t* buffer_from)
 {
     uint8_t number_of_properties = 0;
     {
@@ -71,11 +71,16 @@ void channel_object_read(ChannelObject* obj, uint16_t buffer_available, uint16_t
             it += sizeof(ChannelObjectProperty) + value_size;
         }
 
-        proto_assert(it == end, "Properties overrun: %p > %p", it, end);
+        if (it != end)
+        {
+            return 1;
+        }
     }
 
-    proto_assert_str(sizeof(ChannelObject) + (number_of_properties + 1) * sizeof(ChannelObjectProperty*)
-        <= buffer_available, "Header overrun");
+    if (sizeof(ChannelObject) + (number_of_properties + 1) * sizeof(ChannelObjectProperty*) > buffer_available)
+    {
+        return 2;
+    }
 
     obj->object_size = object_size;
 
@@ -94,6 +99,7 @@ void channel_object_read(ChannelObject* obj, uint16_t buffer_available, uint16_t
     }
 
     *properties = NULL;
+    return 0;
 }
 
 ChannelObjectProperty* find_property(ChannelObject* o, uint8_t key)
@@ -104,6 +110,24 @@ ChannelObjectProperty* find_property(ChannelObject* o, uint8_t key)
         if ((*prop)->key == key)
         {
             return *prop;
+        }
+        prop++;
+    }
+
+    return NULL;
+}
+
+ChannelObjectProperty* find_property_match(ChannelObject* o, uint8_t key, const char* match)
+{
+    uint8_t len = strlen(match);
+
+    ChannelObjectProperty** prop = o->properties;
+    while (*prop)
+    {
+        ChannelObjectProperty* p = *prop;
+        if (p->key == key && p->value_size >= len && (memcmp(p->value, match, len) == 0))
+        {
+            return p;
         }
         prop++;
     }

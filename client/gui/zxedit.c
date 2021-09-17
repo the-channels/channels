@@ -1,14 +1,13 @@
 
 #include <string.h>
 #include "zxgui.h"
-#include "zxgui_internal.h"
-#include <font/fzx.h>
-#include "system.h"
+#include "fzx_ui.h"
 #include <stdint.h>
+#include <spectrum.h>
 
 static uint32_t blink = 0;
 
-static void edit_render(uint8_t x, uint8_t y, struct gui_edit_t* this, struct gui_scene_t* scene)
+static void _edit_render(uint8_t x, uint8_t y, struct gui_edit_t* this, struct gui_scene_t* scene)
 {
     x += this->x + 1;
     y += this->y + 1;
@@ -16,25 +15,25 @@ static void edit_render(uint8_t x, uint8_t y, struct gui_edit_t* this, struct gu
     uint8_t flags = is_object_invalidated(this);
     if (flags)
     {
+        uint8_t c = (scene->focus == (void*)this) ? (INK_YELLOW | PAPER_BLACK) : (INK_WHITE | PAPER_BLACK);
+
         if (flags & GUI_FLAG_DIRTY)
         {
-            zxgui_rectangle(INK_YELLOW | BRIGHT | PAPER_BLACK,
+            zxgui_rectangle(BRIGHT | c,
                 x - 1, y - 1, this->w, this->h, GUI_EDIT_LEFT_BOTTOM_CORNER);
 
         }
 
-        zxgui_screen_color(INK_WHITE | PAPER_BLACK);
+        zxgui_screen_color(c);
         zxgui_screen_clear(x, y, this->w - 1, 1);
 
         if (this->value[0])
         {
-            font_state.fgnd_attr = INK_YELLOW | BRIGHT | PAPER_BLACK;
-            fzx_at(&font_state, x * 8, y * 8 + 1);
-            fzx_puts(&font_state, this->value);
+            fzx_ui_color(BRIGHT | c);
+            fzx_ui_puts_at(x * 8 + 1, y * 8 + 1, this->value);
         }
 
         blink = 200;
-
     }
 
     if (scene->focus == (void*)this)
@@ -42,21 +41,18 @@ static void edit_render(uint8_t x, uint8_t y, struct gui_edit_t* this, struct gu
         if (blink++ > 200)
         {
             blink = 0;
-
-            int w = 2 + fzx_string_extent(font_state.font, (char*)this->value);
-
-            font_state.fzx_draw = _fzx_draw_xor;
-            font_state.fgnd_attr = INK_YELLOW | BRIGHT | PAPER_BLACK;
-            fzx_at(&font_state, x * 8 + w, y * 8 + 1);
-            fzx_puts(&font_state, "_");
-            font_state.fzx_draw = _fzx_draw_or;
+            uint16_t w = 2 + fzx_ui_string_extent((char*)this->value);
+            fzx_ui_switch_xor();
+            fzx_ui_color(INK_YELLOW | BRIGHT | PAPER_BLACK);
+            fzx_ui_puts_at(x * 8 + w, y * 8 + 1, "_");
+            fzx_ui_switch_or();
         }
     }
 
 
 }
 
-static uint8_t edit_event(enum gui_event_type event_type, void* event, struct gui_edit_t* this, struct gui_scene_t* scene)
+static uint8_t _edit_event(enum gui_event_type event_type, void* event, struct gui_edit_t* this, struct gui_scene_t* scene)
 {
     if (scene->focus != (void*)this)
         return 0;
@@ -89,7 +85,7 @@ static uint8_t edit_event(enum gui_event_type event_type, void* event, struct gu
                 default:
                 {
                     int len = strlen(this->value);
-                    if (len >= sizeof(this->value) - 1)
+                    if (len >= this->value_size - 1)
                     {
                         return 0;
                     }
@@ -106,16 +102,12 @@ static uint8_t edit_event(enum gui_event_type event_type, void* event, struct gu
     return 0;
 }
 
-
-void zxgui_edit_init(struct gui_edit_t* edit, uint8_t x, uint8_t y, uint8_t w, uint8_t h)
+void zxgui_edit_init(struct gui_edit_t* edit, xywh_t xywh,
+    char* buffer, uint16_t buffer_size) ZXGUI_CDECL
 {
-    edit->render = (gui_render_f)edit_render;
-    edit->event = (gui_event_f)edit_event;
+    zxgui_base_init(edit, xywh, _edit_render, _edit_event);
+
     edit->flags = GUI_FLAG_DIRTY;
-    edit->next = NULL;
-    memset(edit->value, 0, sizeof(edit->value));
-    edit->x = x;
-    edit->y = y;
-    edit->w = w;
-    edit->h = h;
+    edit->value = buffer;
+    edit->value_size = buffer_size;
 }

@@ -1,11 +1,12 @@
 #include "heap.h"
 
 #include <stdint.h>
-#include <stdlib.h>
 #include "proto_asserts.h"
 #include "system.h"
+#include "netlog.h"
 
-uint8_t heap_data[3200];
+uint8_t heap_data[HEAP_SIZE];
+uint8_t* heap_ptr = heap_data;
 
 uint8_t next_allocated_blob = 0;
 
@@ -20,22 +21,28 @@ uint8_t allocate_heap_blob()
     return next_allocated_blob++;
 }
 
-uint8_t* open_heap_blob(uint8_t blob_num)
+uint8_t* open_heap_blob(uint8_t blob_num) __z88dk_fastcall
 {
     uint8_t page = SPECTRANET_FIRST_USER_PAGE + (blob_num / SPECTRANET_BLOB_PER_PAGE);
     uint16_t offset = (blob_num % SPECTRANET_BLOB_PER_PAGE) * SPECTRANET_BLOB_SIZE;
-    pagein();
-    setpageb(page);
-    return (uint8_t*)0x2000 + offset;
+    setpagea(page);
+    return (uint8_t*)PAGE_A_PTR + offset;
 }
 
-void close_heap_blob()
+void* alloc_heap(uint16_t size) __z88dk_fastcall
 {
-    pageout();
+    if (heap_ptr - heap_data + size > HEAP_SIZE)
+    {
+        return NULL;
+    }
+    uint8_t* res = heap_ptr;
+    memset(res, 0, size);
+    heap_ptr += size;
+
+    return res;
 }
 
 void reset_heap()
 {
-    mallinit();
-    sbrk(&heap_data, sizeof(heap_data));
+    heap_ptr = heap_data;
 }

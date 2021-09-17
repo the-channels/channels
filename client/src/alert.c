@@ -1,5 +1,4 @@
 #include "zxgui.h"
-#include "zxgui_internal.h"
 #include "scenes.h"
 #include "system.h"
 #include <string.h>
@@ -19,11 +18,11 @@ void init_alert()
 {
     zxgui_scene_init(&scene, NULL);
 
-    zxgui_form_init(&alert, 0, 10, 31, 4, alert_message, FORM_STYLE_DEFAULT);
+    zxgui_form_init(&alert, XYWH(0, 10, 31, 4), alert_message, FORM_STYLE_DEFAULT);
 
     {
         static struct gui_button_t button_cancel;
-        zxgui_button_init(&button_cancel, 0, 1, 8, 1, 13, GUI_ICON_RETURN, "OK", return_to_callback);
+        zxgui_button_init(&button_cancel, XYWH(0, 1, 8, 1), 13, GUI_ICON_RETURN, "OK", return_to_callback);
         zxgui_form_add_child(&alert, &button_cancel);
     }
 

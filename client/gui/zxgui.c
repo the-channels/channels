@@ -1,45 +1,44 @@
 #include "zxgui.h"
-#include "zxgui_internal.h"
 
 typedef uint8_t uchar;
 
 #include <stdint.h>
-#include <font/fzx.h>
 #include <string.h>
-#include "system.h"
+#include <spectrum.h>
+#include <fzx_ui.h>
 #include "zxgui_tiles.h"
 
-struct fzx_state font_state;
-struct r_Rect16 screen = { 0, 256, 0, 192 };
-
-void zxgui_init()
+void zxgui_init(void)
 {
+    fzx_ui_init();
+
     zx_border(INK_BLACK);
     zx_colour(BRIGHT | INK_GREEN | PAPER_BLACK);
     zx_cls();
 
-    fzx_state_init(&font_state, &ff_utz_TinyTexanS, &screen);
-
-    font_state.fgnd_attr = BRIGHT | INK_GREEN | PAPER_BLACK;
-    font_state.fgnd_mask = 0;
-    font_state.fzx_draw = _fzx_draw_or;
-    font_state.left_margin = 0;
-
-    font_state.y = 32;
-    font_state.x = 0;
-
-    zxgui_reset_paper();
+    fzx_ui_set_paper(0, 0, 256, 192);
 }
 
-void zxgui_reset_paper()
+xywh_t get_xywh(uint8_t x, uint8_t y, uint8_t w, uint8_t h) __z88dk_callee
 {
-    font_state.paper.x = 0;
-    font_state.paper.y = 0;
-    font_state.paper.width = 256;
-    font_state.paper.height = 192;
+    return (xywh_t)x | ((xywh_t)y << 8) | ((xywh_t)w << 16) | ((xywh_t)h << 24);
 }
 
-void zxgui_icon(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* source)
+void zxgui_base_init(void* o, xywh_t xywh, void* render, void* event) ZXGUI_CDECL
+{
+    struct gui_object_t* s = (struct gui_object_t*)o;
+
+    s->x = (uint8_t)(xywh);
+    s->y = (uint8_t)(xywh >> 8);
+    s->w = (uint8_t)(xywh >> 16);
+    s->h = (uint8_t)(xywh >> 24);
+
+    s->next = NULL;
+    s->render = render;
+    s->event = event;
+}
+
+void zxgui_icon(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* source) __z88dk_callee
 {
     zxgui_screen_color(form_color);
     for (uint8_t j = y; j < y + h; j++)
@@ -51,7 +50,7 @@ void zxgui_icon(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t h, 
     }
 }
 
-void zxgui_image(uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* source, const uint8_t* colors)
+void zxgui_image(uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* source, const uint8_t* colors) __z88dk_callee
 {
     for (uint8_t j = y; j < y + h; j++)
     {
@@ -70,7 +69,7 @@ void zxgui_image(uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* sour
     }
 }
 
-void zxgui_line(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t c)
+void zxgui_line(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t c) __z88dk_callee
 {
     uint8_t* data = get_gui_tiles() + c * 8;
     uint8_t* addr = zx_cxy2saddr(x, y);
@@ -84,7 +83,7 @@ void zxgui_line(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t c)
     memset(zx_cxy2aaddr(x, y), form_color, w);
 }
 
-void zxgui_rectangle(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t c)
+void zxgui_rectangle(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t c) __z88dk_callee
 {
     zxgui_screen_color(form_color);
 

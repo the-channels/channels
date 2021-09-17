@@ -1,0 +1,14 @@
+[Unit]
+Description=TNFS Server
+After=remote-fs.target
+After=syslog.target
+
+# replace /tnfs with your TNFS directory
+
+[Service]
+User=tnfs
+Group=tnfs
+ExecStart=/usr/local/sbin/tnfsd /tnfs
+
+[Install]
+WantedBy=multi-user.target

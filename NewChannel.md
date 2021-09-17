@@ -2,7 +2,7 @@
 
 # How channels work
 
-Despite being written in C++, the Hub uses Python to convert channel specifics into
+The Hub uses Python to convert channel specifics into
 a standardized form.
 
 ![channels](https://user-images.githubusercontent.com/1666014/127716547-670110c4-4c16-47a9-8a72-954963ec54fc.png)
@@ -10,7 +10,7 @@ a standardized form.
 Logic blocks marked here in green are Python packages.
 The hub simply scans installed packages that match and loads them up.
 
-Some packaged are distributed with the hub, but other could be insalled into the sytem,
+Some packaged are distributed with the hub, but other could be installed into the system,
 and the Hub would detect it. 
 
 # How to create a new channel
@@ -53,7 +53,7 @@ __import__('pkg_resources').declare_namespace(__name__)
 ### `channels/your_channel/__init__.py`
 
 This is your main file, which will have your channel implementation.
-You can refer to [4chan's implementation](hub/channels/channels/fourchan/__init__.py) as an example.
+You can refer to [spectrumcomputing implementation](hub/channels/channels/spectrumcomputing/__init__.py) as an example.
 It should work like so:
 * It should have a class derived from `Channel`, which will be your channel's logic.
 * This class should implement all [methods as documented](hub/channels/channels/base/__init__.py)
@@ -67,7 +67,7 @@ Well, just shoot `python3 setup.py install`.
 You can even publish it on pip if you want, package name is irrelevant,
 as long as it keeps the integrity of the `channels.*` namespace package.
 
-You can also have a docker image that's based [off the one Hub uses](Dockerfile.hub)
+You can also have a docker image that's based [off the one Hub uses](Dockerfile)
 and install additional python packages for new channels you want.
 
 # But how does it work?

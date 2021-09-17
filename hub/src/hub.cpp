@@ -5,6 +5,7 @@
 #include <iostream>
 #include <cstdlib>
 #include "board.h"
+#include "setting_def.h"
 #include "python_channel.h"
 
 ChannelHub* ChannelHub::s_hub = nullptr;
@@ -13,7 +14,8 @@ bool ChannelHub::s_debug = false;
 
 ChannelHub::ChannelHub() :
     m_image_processing(),
-    m_python()
+    m_python(),
+    m_next_image_id(0)
 {
     s_hub = this;
 }
@@ -67,6 +69,14 @@ void ChannelHub::new_client(int client)
     }
 }
 
+void ChannelHub::set_key(int client, const std::string& key)
+{
+    for (auto& entry: m_channels)
+    {
+        entry.second->set_key(client, key);
+    }
+}
+
 void ChannelHub::client_released(int client)
 {
     for (auto& entry: m_channels)
@@ -99,74 +109,57 @@ GetBoardsResult ChannelHub::get_boards(int client, const ChannelId &channel, uin
     return ch->get_boards(client, limit);
 }
 
-GetImageResult ChannelHub::get_image(int client, const ChannelId &channel, const BoardId &board,
-    const ThreadId& thread, const PostId &post, uint32_t target_w, uint32_t target_h,
+GetSettingDefsResult ChannelHub::get_setting_defs(int client, const ChannelId &channel)
+{
+    const ChannelPtr& ch = get_channel(channel);
+    if (ch == nullptr)
+    {
+        return GetSettingDefsResult(CallbackStatus::unknown_resource, std::vector<class SettingDef>());
+    }
+
+    return ch->get_setting_defs(client);
+}
+
+void ChannelHub::set_settings(int client, const ChannelId &channel, const std::unordered_map<std::string, std::string>& s)
+{
+    const ChannelPtr& ch = get_channel(channel);
+    if (ch == nullptr)
+    {
+        return;
+    }
+
+    return ch->set_settings(client, s);
+}
+
+uint16_t ChannelHub::register_image(const std::string& url)
+{
+    auto it = m_images.find(url);
+    if (it == m_images.end())
+    {
+        m_next_image_id++;
+        m_images[url] = m_next_image_id;
+        m_image_ids[m_next_image_id] = url;
+        return m_next_image_id;
+    }
+    else
+    {
+        return it->second;
+    }
+}
+
+GetImageResult ChannelHub::get_image(int client, const ChannelId &channel, uint16_t image_id,
+    uint32_t target_w, uint32_t target_h,
     ImageProcessing::ImageEncoding encoding)
 {
-    std::string attachment;
-    uint32_t w = 0;
-    uint32_t h = 0;
+    auto it = m_image_ids.find(image_id);
 
+    if (it == m_image_ids.end())
     {
-        std::lock_guard<std::mutex> cache_guard(m_catalog_cache_mutex);
-
-        auto cached_catalog_thread = m_catalog_cache.find({client, channel, board});
-        if (cached_catalog_thread != m_catalog_cache.end())
-        {
-            auto& cached_catalog = cached_catalog_thread->second;
-
-            for (auto& th: cached_catalog)
-            {
-                if (th.id == thread)
-                {
-                    attachment = th.attachment;
-                    w = th.attachment_width;
-                    h = th.attachment_height;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (!attachment.empty())
-    {
-        std::lock_guard<std::mutex> cache_guard(m_thread_cache_mutex);
-        auto cached_thread = m_thread_cache.find({client, channel, board, thread});
-        if (cached_thread != m_thread_cache.end())
-        {
-            auto& posts = cached_thread->second;
-
-            for (auto& ps: posts)
-            {
-                if (ps.id == post)
-                {
-                    attachment = ps.attachment;
-                    w = ps.attachment_width;
-                    h = ps.attachment_height;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (attachment.empty())
-    {
-        std::cerr << "empty attachment" << std::endl;
+        std::cerr << "unknown image" << std::endl;
         return GetImageResult(CallbackStatus::unknown_resource);
     }
 
-    if (target_w > w)
-    {
-        std::cerr << "wrong target_w" << std::endl;
-        return GetImageResult(CallbackStatus::failed);
-    }
-
-    if (target_h > h)
-    {
-        std::cerr << "wrong target_h" << std::endl;
-        return GetImageResult(CallbackStatus::failed);
-    }
-
+    const std::string& url = it->second;
     const ChannelPtr& ch = get_channel(channel);
     if (ch == nullptr)
     {
@@ -176,14 +169,14 @@ GetImageResult ChannelHub::get_image(int client, const ChannelId &channel, const
 
     std::string fname;
 
-    auto result = ch->get_attachment(client, board, thread, post, attachment, w, h, fname);
+    auto result = ch->get_attachment(client, url, fname);
     if (result != CallbackStatus::ok)
     {
         std::cerr << "Cannot fetch attachment" << std::endl;
         return GetImageResult(result);
     }
 
-    return m_image_processing.reencode_image(fname, w, h, target_w, target_h, encoding);
+    return m_image_processing.reencode_image(fname, target_w, target_h, encoding);
 }
 
 GetThreadsResult ChannelHub::get_threads(

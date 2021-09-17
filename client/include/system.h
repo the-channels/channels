@@ -1,7 +1,6 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
-#define in_inkey in_Inkey
 #include <spectrum.h>
 #include <input.h>
 
