@@ -124,7 +124,7 @@ uint8_t zxgui_label_text_height(uint8_t w, const char* title, uint16_t len) ZXGU
 
         if (res >= 32)
         {
-            return 3;
+            return 32;
         }
 
         c = next_line;

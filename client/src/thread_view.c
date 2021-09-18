@@ -898,11 +898,11 @@ static void process_entry(ChannelObject* object)
             }
 
             th->height = th->attachment_h;
-            label_w = 172;
+            label_w = 170;
         }
         else
         {
-            label_w = 252;
+            label_w = 250;
         }
 
         uint8_t min_height = zxgui_label_text_height(label_w, comment->value, comment->value_size);

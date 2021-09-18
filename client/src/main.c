@@ -68,7 +68,7 @@ void switch_main()
         }
         else
         {
-            set_connect_to_proxy_address("localhost");
+            set_connect_to_proxy_address("127.0.0.1");
         }
 
         switch_connect_to_proxy();
