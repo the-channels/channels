@@ -2,7 +2,7 @@
 #include <string.h>
 #include "zxgui.h"
 #include <spectrum.h>
-#include <fzx_ui.h>
+#include <text_ui.h>
 
 static void _button_render(uint8_t x, uint8_t y, struct gui_button_t* this, struct gui_scene_t* scene)
 {
@@ -23,8 +23,8 @@ static void _button_render(uint8_t x, uint8_t y, struct gui_button_t* this, stru
         {
             x++;
 
-            fzx_ui_color(INK_WHITE | PAPER_BLACK);
-            fzx_ui_puts_at(x * 8 + 1, y * 8 + 1, (char*)this->title);
+            text_ui_color(INK_WHITE | PAPER_BLACK);
+            text_ui_puts_at(x, y, (char *) this->title);
         }
     }
 }

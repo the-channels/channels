@@ -3,7 +3,8 @@
 
 #include "zxgui.h"
 #include <spectrum.h>
-#include <fzx_ui.h>
+#include <text_ui.h>
+#include <string.h>
 
 static void _form_render(uint8_t x, uint8_t y, struct gui_form_t* this, struct gui_scene_t* scene)
 {
@@ -50,9 +51,10 @@ static void _form_render(uint8_t x, uint8_t y, struct gui_form_t* this, struct g
         zxgui_screen_color(f);
         zxgui_screen_clear(x + 1, y + 1, this->w - 1, 1);
 
-        int16_t title_offset = ((this->w + 1) * 8 - fzx_ui_string_extent((char*)this->title)) / 2;
-        fzx_ui_color(f);
-        fzx_ui_puts_at(x * 8 + title_offset, (y + 1) * 8 + 1, this->title);
+        uint8_t ll = strlen(((char *) this->title)) / 2;
+        int16_t title_offset = (this->w - ll) / 2;
+        text_ui_color(f);
+        text_ui_puts_at(x + title_offset, y + 1, this->title);
     }
 
     x += 1;

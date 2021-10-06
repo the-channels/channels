@@ -1,5 +1,5 @@
 #define DECLARE_MODULES_SYMBOLS
-#include <fzx_ui.h>
+#include <text_ui.h>
 
 /*
  * this file might appear empty, but it actually declares symbols.

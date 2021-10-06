@@ -60,6 +60,8 @@ enum gui_tiles {
     GUI_ICON_REPLIES,
     GUI_ICON_REPLY,
     GUI_ICON_QUESTION,
+    GUI_ICON_R,
+    GUI_ICON_N,
 };
 
 enum gui_event_type {
@@ -258,7 +260,7 @@ void zxgui_label_init(struct gui_label_t* label, xywh_t xywh,
     const char* title, uint8_t color, uint8_t flags) ZXGUI_CDECL;
 void zxgui_dynamic_label_init(struct gui_dynamic_label_t* label, xywh_t xywh,
     uint8_t color, uint8_t flags, gui_label_obtain_title_data_f obtain_data, void* user) ZXGUI_CDECL;
-uint8_t zxgui_label_text_height(uint8_t w, const char* text, uint16_t len) ZXGUI_CDECL;
+uint8_t zxgui_label_text_height(uint8_t w, const char* text, uint16_t len, uint8_t max_height) ZXGUI_CDECL;
 void zxgui_animated_icon_init(struct gui_animated_icon_t* icon, xywh_t xywh,
     uint8_t frames, uint8_t color, const uint8_t* source, uint8_t speed) ZXGUI_CDECL;
 void zxgui_image_init(struct gui_image_t* image, xywh_t xywh,

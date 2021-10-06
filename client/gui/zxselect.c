@@ -1,7 +1,7 @@
 
 #include <string.h>
 #include "zxgui.h"
-#include <fzx_ui.h>
+#include <text_ui.h>
 #include <stdint.h>
 #include <spectrum.h>
 #include <ctype.h>
@@ -68,7 +68,6 @@ static void _select_render(uint8_t x, uint8_t y, struct gui_select_t* this, stru
     {
         zxgui_screen_color(color);
         zxgui_screen_clear(x, y, this->w - 1, hh);
-        fzx_ui_set_paper(x * 8, y * 8, (this->w - 1) * 8, (this->h - 1) * 8);
 
         offset = 0;
 
@@ -77,29 +76,30 @@ static void _select_render(uint8_t x, uint8_t y, struct gui_select_t* this, stru
         {
             if (o == selection)
             {
-                fzx_ui_color(color_inv);
-                fzx_ui_switch_xor();
-
+                text_ui_color(color_inv);
                 zxgui_screen_color(color_inv);
                 zxgui_screen_clear(x, y + offset, this->w - 1, 1);
             }
             else
             {
                 zxgui_screen_color(color);
-                fzx_ui_color(color);
-                fzx_ui_switch_or();
+                text_ui_color(color);
             }
+
+            uint8_t ww = this->w - 2;
 
             if (offset == 0 && o->prev)
             {
-                zxgui_screen_put(x + this->w - 2, y + offset, GUI_ICON_LESS_TO_FOLLOW);
+                zxgui_screen_put(x + ww, y + offset, GUI_ICON_LESS_TO_FOLLOW);
             }
             else if (offset == hh - 1 && o->next)
             {
-                zxgui_screen_put(x + this->w - 2, y + offset, GUI_ICON_MORE_TO_FOLLOW);
+                zxgui_screen_put(x + ww, y + offset, GUI_ICON_MORE_TO_FOLLOW);
             }
 
-            fzx_ui_puts_at(9, offset * 8 + 1, o->value);
+            uint8_t len = strlen(o->value);
+            if (len > (ww << 1)) len = ww << 1;
+            text_ui_write_at(x + 1, y + offset, o->value, len);
 
             offset++;
 
@@ -109,8 +109,6 @@ static void _select_render(uint8_t x, uint8_t y, struct gui_select_t* this, stru
             }
             o = o->next;
         }
-
-        fzx_ui_set_paper(0, 0, 256, 192);
     }
 
     if (flags & GUI_FLAG_DIRTY_INTERNAL)

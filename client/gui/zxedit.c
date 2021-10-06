@@ -1,11 +1,41 @@
 
 #include <string.h>
 #include "zxgui.h"
-#include "fzx_ui.h"
+#include "text_ui.h"
 #include <stdint.h>
 #include <spectrum.h>
 
 static uint32_t blink = 0;
+
+static void _render_blink_even(uint8_t *addr) __z88dk_fastcall __naked
+{
+#asm
+    ld b, 8
+_render_blink_even_loop:
+    ld a, (hl)
+    xor $0F
+    ld (hl), a
+    inc h
+    dec b
+    jp nz, _render_blink_even_loop
+    ret
+#endasm
+}
+
+static void _render_blink_odd(uint8_t *addr) __z88dk_fastcall __naked
+{
+#asm
+    ld b, 8
+_render_blink_odd_loop:
+    ld a, (hl)
+    xor $F0
+    ld (hl), a
+    inc h
+    dec b
+    jp nz, _render_blink_odd_loop
+    ret
+#endasm
+}
 
 static void _edit_render(uint8_t x, uint8_t y, struct gui_edit_t* this, struct gui_scene_t* scene)
 {
@@ -22,6 +52,8 @@ static void _edit_render(uint8_t x, uint8_t y, struct gui_edit_t* this, struct g
             zxgui_rectangle(BRIGHT | c,
                 x - 1, y - 1, this->w, this->h, GUI_EDIT_LEFT_BOTTOM_CORNER);
 
+            zxgui_screen_color(c);
+            zxgui_screen_clear(x, y, this->w - 1, 1);
         }
 
         zxgui_screen_color(c);
@@ -29,23 +61,32 @@ static void _edit_render(uint8_t x, uint8_t y, struct gui_edit_t* this, struct g
 
         if (this->value[0])
         {
-            fzx_ui_color(BRIGHT | c);
-            fzx_ui_puts_at(x * 8 + 1, y * 8 + 1, this->value);
+            text_ui_color(BRIGHT | c);
+            text_ui_puts_at(x, y, this->value);
         }
 
-        blink = 200;
+        blink = 100;
     }
 
     if (scene->focus == (void*)this)
     {
-        if (blink++ > 200)
+        if (blink++ > 100)
         {
             blink = 0;
-            uint16_t w = 2 + fzx_ui_string_extent((char*)this->value);
-            fzx_ui_switch_xor();
-            fzx_ui_color(INK_YELLOW | BRIGHT | PAPER_BLACK);
-            fzx_ui_puts_at(x * 8 + w, y * 8 + 1, "_");
-            fzx_ui_switch_or();
+            uint8_t w = strlen((char *) this->value);
+            uint8_t xx = x + (w >> 1);
+            uint8_t* addr = zx_cxy2saddr(xx, y);
+
+            if (w & 0x01)
+            {
+                _render_blink_even(addr);
+            }
+            else
+            {
+                _render_blink_odd(addr);
+            }
+
+            *zx_cxy2aaddr(xx, y) = INK_YELLOW | BRIGHT | PAPER_BLACK;
         }
     }
 
@@ -73,6 +114,7 @@ static uint8_t _edit_event(enum gui_event_type event_type, void* event, struct g
                     {
                         len--;
                         this->value[len] = 0;
+                        blink = 200;
                         object_invalidate(this, GUI_FLAG_DIRTY_INTERNAL);
                     }
                     return 1;
@@ -92,6 +134,7 @@ static uint8_t _edit_event(enum gui_event_type event_type, void* event, struct g
                     this->value[len] = ev->key;
                     len++;
                     this->value[len] = 0;
+                    blink = 200;
                     object_invalidate(this, GUI_FLAG_DIRTY_INTERNAL);
                     return 1;
                 }

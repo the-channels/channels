@@ -28,10 +28,10 @@ void zxgui_screen_clear(uint8_t x, uint8_t y, uint8_t w, uint8_t h) __z88dk_call
     {
         uint8_t* addr = zx_cxy2saddr(x, yh);
 
-        uint8_t i = 8;
-        while (--i)
+        for (uint8_t i = 0; i < 8; i++)
         {
-            memset(addr, 0, w); addr += 256;
+            memset(addr, 0, w);
+            addr += 256;
         }
 
         memset(c, screen_color, w);

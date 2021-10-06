@@ -5,18 +5,16 @@ typedef uint8_t uchar;
 #include <stdint.h>
 #include <string.h>
 #include <spectrum.h>
-#include <fzx_ui.h>
+#include <text_ui.h>
 #include "zxgui_tiles.h"
 
 void zxgui_init(void)
 {
-    fzx_ui_init();
+    text_ui_init();
 
     zx_border(INK_BLACK);
     zx_colour(BRIGHT | INK_GREEN | PAPER_BLACK);
     zx_cls();
-
-    fzx_ui_set_paper(0, 0, 256, 192);
 }
 
 xywh_t get_xywh(uint8_t x, uint8_t y, uint8_t w, uint8_t h) __z88dk_callee

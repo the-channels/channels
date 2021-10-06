@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include "zxgui.h"
-#include <fzx_ui.h>
+#include <text_ui.h>
 #include "scenes.h"
 #include "system.h"
 #include "netlog.h"
@@ -50,10 +50,22 @@ struct help_scene_objects_t
     struct gui_button_t next_thread_6;
     struct gui_button_t prev_thread;
     struct gui_button_t prev_thread_7;
+    struct gui_button_t button_reply;
+    struct gui_button_t button_new_post;
+};
+
+struct posting_scene_objects_t
+{
+    struct gui_scene_t scene;
+    struct gui_label_t title;
+    struct gui_button_t button_exit;
+    struct gui_edit_t post_body;
+    char post_content[1024];
 };
 
 struct scene_objects_t* scene_objects = NULL;
 struct help_scene_objects_t* help_scene_objects = NULL;
+struct posting_scene_objects_t* posting_scene_objects = NULL;
 
 static uint8_t first_object = 0;
 static uint8_t grayscale = 0;
@@ -219,6 +231,7 @@ static void switch_back_to_boards()
 }
 
 static uint8_t request();
+static void switch_posting_mode();
 
 static void switch_back_to_threads()
 {
@@ -451,19 +464,19 @@ static void redraw_screen()
 
         if (has_title)
         {
-            has_title = (fzx_ui_string_extent(th->title) >> 3) + 1;
+            uint8_t ll = strlen(th->title);
+            has_title = (ll >> 4) + 1;
             zxgui_screen_clear(1, h, has_title, 1);
-            fzx_ui_puts_at(9, h * 8 + 1, th->title);
+            text_ui_puts_at(1, h, th->title);
         }
 
         zxgui_screen_recolor(0, h, 32, 1);
         zxgui_screen_put(28, h, GUI_ICON_REPLIES);
 
-        fzx_ui_color(cc);
-        fzx_ui_at(29 * 8 + 1, h * 8 + 1);
+        text_ui_color(cc);
         char header[8];
         itoa(th->replies, header, 10);
-        fzx_ui_puts(header);
+        text_ui_puts_at(29, h, header);
 
         h++;
 
@@ -717,6 +730,11 @@ static void key_pressed(int key)
             open_full_picture(NULL);
             break;
         }
+        case 'n':
+        {
+            switch_posting_mode();
+            break;
+        }
         // select next entry
         case 10:
         case '6':
@@ -806,6 +824,43 @@ static void exit_help(struct gui_button_t* this)
     switch_back_to_threads();
 }
 
+static void exit_posting(struct gui_button_t* this)
+{
+    switch_posting_mode();
+}
+
+static void switch_posting_mode()
+{
+    if (requests_locked)
+        return;
+
+    free_view();
+
+    posting_scene_objects = alloc_heap(sizeof(struct posting_scene_objects_t));
+    proto_assert_str(posting_scene_objects, "Cannot allocate");
+
+    zxgui_scene_init(&posting_scene_objects->scene, NULL);
+
+    {
+        zxgui_label_init(&posting_scene_objects->title, XYWH(0, 0, 32, 1), "NEW POST", INK_BLACK | PAPER_WHITE, 0);
+        zxgui_scene_add(&posting_scene_objects->scene, &posting_scene_objects->title);
+    }
+
+    {
+        strcpy(posting_scene_objects->post_content, "");
+        zxgui_edit_init(&posting_scene_objects->post_body, XYWH(0, 1, 31, 21), posting_scene_objects->post_content, 64);
+        zxgui_scene_add(&posting_scene_objects->scene, &posting_scene_objects->post_body);
+    }
+
+    {
+        zxgui_button_init(&posting_scene_objects->button_exit, XYWH(0, 23, 0, 1), 32, GUI_ICON_SPACE, "BACK", exit_posting);
+        zxgui_scene_add(&posting_scene_objects->scene, &posting_scene_objects->button_exit);
+    }
+
+    zxgui_scene_set_focus(&posting_scene_objects->scene, &posting_scene_objects->post_body);
+    zxgui_scene_set(&posting_scene_objects->scene);
+}
+
 static void switch_help(struct gui_button_t* this)
 {
     if (requests_locked)
@@ -853,6 +908,16 @@ static void switch_help(struct gui_button_t* this)
         zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->prev_thread_7);
     }
 
+    {
+        zxgui_button_init(&help_scene_objects->button_reply, XYWH(1, 9, 0, 1), 'r', GUI_ICON_R, "Reply to a POST", NULL);
+        zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->button_reply);
+    }
+
+    {
+        zxgui_button_init(&help_scene_objects->button_new_post, XYWH(1, 11, 0, 1), 'n', GUI_ICON_N, "New POST to a THREAD", NULL);
+        zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->button_new_post);
+    }
+
     zxgui_scene_set(&help_scene_objects->help_scene);
 }
 
@@ -898,29 +963,23 @@ static void process_entry(ChannelObject* object)
             }
 
             th->height = th->attachment_h;
-            label_w = 170;
+            label_w = 21;
         }
         else
         {
-            label_w = 250;
+            label_w = 31;
         }
 
-        uint8_t min_height = zxgui_label_text_height(label_w, comment->value, comment->value_size);
-        if (post_mode)
-        {
-            if (min_height > 22)
-            {
-                min_height = 22;
-            }
-        }
-        else
-        {
-            if (min_height > 10)
-            {
-                min_height = 10;
-            }
-        }
+        th->comment_blob_id = allocate_heap_blob();
 
+        uint8_t* comment_blob_data = open_heap_blob(th->comment_blob_id);
+        memcpy(comment_blob_data, comment->value, comment->value_size);
+        comment_blob_data[comment->value_size] = 0;
+
+        uint8_t max_height = post_mode ? 22 : 10;
+
+        uint8_t min_height = zxgui_label_text_height(label_w, (char*)comment_blob_data,
+            comment->value_size, max_height);
 
         if (th->height < min_height)
         {
@@ -968,11 +1027,6 @@ static void process_entry(ChannelObject* object)
         th->screen_num = process_screen_num;
 
         memcpy(th->id, thead_id->value, thead_id->value_size);
-
-        th->comment_blob_id = allocate_heap_blob();
-        uint8_t* comment_blob_data = open_heap_blob(th->comment_blob_id);
-        memcpy(comment_blob_data, comment->value, comment->value_size);
-        comment_blob_data[comment->value_size] = 0;
 
         th->replies = get_uint16_property(object, 'r', 0);
 

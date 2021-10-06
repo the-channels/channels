@@ -109,6 +109,36 @@ class Channel(object):
         s = s.replace("&lt;", "<")
         return s
 
+    @staticmethod
+    def split_index(s: str, text_width: int):
+        index = 0
+        height = 0
+        for line in s.split('\n'):
+            while len(line) > text_width:
+                line = line[text_width:]
+                index += text_width
+                height += 1
+                if height >= 22:
+                    return index
+
+            index += len(line)
+            height += 1
+            if height >= 22:
+                return index
+
+            index += 1
+        return None
+
+    @staticmethod
+    def split_comment(s: str):
+        while True:
+            i = Channel.split_index(s, 44)
+            if i is None:
+                break
+            yield s[:i]
+            s = s[i:]
+        yield s
+
     def get_cache_key(self, key):
         return "cache/" + self.name() + "_" + key
 

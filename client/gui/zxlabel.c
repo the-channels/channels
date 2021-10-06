@@ -2,7 +2,7 @@
 #include <string.h>
 #include "zxgui.h"
 #include <spectrum.h>
-#include <fzx_ui.h>
+#include <text_ui.h>
 
 static void _label_render(uint8_t x, uint8_t y, struct gui_label_t* this, struct gui_scene_t* scene)
 {
@@ -14,17 +14,15 @@ static void _label_render(uint8_t x, uint8_t y, struct gui_label_t* this, struct
 
     zxgui_screen_color(this->color);
     zxgui_screen_clear(x, y, this->w, this->h);
-    fzx_ui_color(this->color);
-
-    uint16_t w = this->w * 8;
+    text_ui_color(this->color);
 
     if (this->flags & GUI_FLAG_MULTILINE)
     {
         char* c = (char*)this->title;
         const char* end = c + strlen(c);
-        uint8_t offset_x = x * 8 + 1;
-        uint8_t offset_y = y * 8 + 1;
-        uint8_t max_offset_y = offset_y + this->h * 8;
+        uint8_t offset_x = x;
+        uint8_t offset_y = y;
+        uint8_t max_offset_y = offset_y + this->h;
         uint8_t new_line = 1;
 
         do
@@ -39,24 +37,19 @@ static void _label_render(uint8_t x, uint8_t y, struct gui_label_t* this, struct
             {
                 if (*c == '>' && (*(c + 1) != '>'))
                 {
-                    fzx_ui_color(INK_GREEN | PAPER_BLACK);
+                    text_ui_color(INK_GREEN | PAPER_BLACK);
                 }
                 else
                 {
-                    fzx_ui_color(this->color);
+                    text_ui_color(this->color);
                 }
             }
 
-            char* next_line = fzx_ui_buffer_partition_ww(c, (uint16_t)(end - c), w);
-
-            if (next_line == c)
-            {
-                next_line = fzx_ui_buffer_partition(c, (uint16_t)(end - c), w);
-            }
+            char* next_line = text_ui_buffer_partition(c, (uint16_t) (end - c), this->w);
 
             if (c != next_line)
             {
-                fzx_ui_write_at(offset_x, offset_y, c, next_line - c);
+                text_ui_write_at(offset_x, offset_y, c, next_line - c);
             }
 
             if (*next_line == '\n')
@@ -69,7 +62,7 @@ static void _label_render(uint8_t x, uint8_t y, struct gui_label_t* this, struct
                 new_line = 0;
             }
 
-            offset_y += 8;
+            offset_y++;
             if (offset_y >= max_offset_y)
             {
                 break;
@@ -79,14 +72,12 @@ static void _label_render(uint8_t x, uint8_t y, struct gui_label_t* this, struct
     }
     else
     {
-        fzx_ui_puts_at(x * 8 + 1, y * 8 + 1, this->title);
+        text_ui_puts_at(x, y, this->title);
     }
 }
 
-uint8_t zxgui_label_text_height(uint8_t w, const char* title, uint16_t len) ZXGUI_CDECL
+uint8_t zxgui_label_text_height(uint8_t w, const char* title, uint16_t len, uint8_t max_height) ZXGUI_CDECL
 {
-    w--;
-
     char* c = (char*)title;
     const char* end = c + len;
     uint8_t res = 0;
@@ -99,12 +90,7 @@ uint8_t zxgui_label_text_height(uint8_t w, const char* title, uint16_t len) ZXGU
             c++;
         }
 
-        char* next_line = fzx_ui_buffer_partition_ww(c, (uint16_t)(end - c), w);
-
-        if (next_line == c)
-        {
-            next_line = fzx_ui_buffer_partition(c, (uint16_t)(end - c), w);
-        }
+        char* next_line = text_ui_buffer_partition(c, (uint16_t) (end - c), w);
 
         if (next_line == c)
         {
@@ -121,13 +107,12 @@ uint8_t zxgui_label_text_height(uint8_t w, const char* title, uint16_t len) ZXGU
         }
 
         res++;
-
-        if (res >= 32)
-        {
-            return 32;
-        }
-
         c = next_line;
+
+        if (res > max_height)
+        {
+            return max_height;
+        }
     } while (c < end);
 
     return res;

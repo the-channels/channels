@@ -71,21 +71,27 @@ class FourChanChannel(Channel):
                 continue
             if "com" not in post:
                 continue
-            result_post = ChannelPost(str(post["no"]))
-            if "sub" in post:
-                result_post.title = post["sub"]
-            if ("tim" in post) and ("ext" in post):
-                url = FourChanChannel.attachment_url + "/" + board + "/" + str(post["tim"]) + post["ext"]
-                result_post.attachments.append(ChannelAttachment(url))
-            result_post.comment = Channel.strip_html(post["com"])
 
-            for reply in re.finditer(FourChanChannel.post_reply_pattern, result_post.comment):
-                reply_to = reply.group(1)
-                if reply_to in posts_by_id:
-                    posts_by_id[reply_to].replies.append(result_post.id)
+            for index, strip in enumerate(Channel.split_comment(Channel.strip_html(post["com"]))):
 
-            posts.append(result_post)
-            posts_by_id[result_post.id] = result_post
+                post_id = str(post["no"]) if index == 0 else "{0}.{1}".format(str(post["no"]), index)
+                result_post = ChannelPost(post_id)
+                if index == 0:
+                    if "sub" in post:
+                        result_post.title = post["sub"]
+                    if ("tim" in post) and ("ext" in post):
+                        url = FourChanChannel.attachment_url + "/" + board + "/" + str(post["tim"]) + post["ext"]
+                        result_post.attachments.append(ChannelAttachment(url))
+                    for reply in re.finditer(FourChanChannel.post_reply_pattern, strip):
+                        reply_to = reply.group(1)
+                        if reply_to in posts_by_id:
+                            posts_by_id[reply_to].replies.append(result_post.id)
+                else:
+                    result_post.title = "... cont {0}".format(index)
+                    posts_by_id[str(post["no"])].replies.append(result_post.id)
+                result_post.comment = strip
+                posts.append(result_post)
+                posts_by_id[result_post.id] = result_post
 
         return posts
 
