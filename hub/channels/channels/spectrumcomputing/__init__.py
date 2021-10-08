@@ -257,6 +257,8 @@ class SpectrumComputing(Channel):
         else:
             post_url = "https://spectrumcomputing.co.uk/forums/posting.php?mode=reply&f={0}&t={1}".format(board, thread)
 
+        time.sleep(2)
+
         r = client.session.post(post_url, data={
             "message": comment,
             "subject": subject["value"],
