@@ -33,7 +33,7 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
     ChannelHub(), m_port(port)
 {
     m_handlers.emplace("api", [this](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
-        -> const char*
+        -> std::string
     {
         if (amount > 0)
         {
@@ -44,7 +44,7 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
         declare_str_property_on_stack(id_, OBJ_PROPERTY_ID, protocol_version.c_str(), nullptr);
 
         result.push_back(channel_object_allocate(&id_));
-        return nullptr;
+        return "";
     });
 
     m_handlers.emplace("channels", [](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
@@ -55,11 +55,11 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
             result.push_back(channel.second->write());
         }
 
-        return nullptr;
+        return "";
     });
 
     m_handlers.emplace("boards", [](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
-        -> const char*
+        -> std::string
     {
         if (amount == 0)
         {
@@ -87,11 +87,11 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
             result.push_back(board.write());
         }
 
-        return nullptr;
+        return "";
     });
 
     m_handlers.emplace("setting_defs", [](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
-        -> const char*
+        -> std::string
     {
         if (amount == 0)
         {
@@ -123,11 +123,11 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
             result.push_back(def.write());
         }
 
-        return nullptr;
+        return "";
     });
 
     m_handlers.emplace("save_settings", [](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
-    -> const char*
+        -> std::string
     {
         if (amount == 0)
         {
@@ -172,11 +172,11 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
             result.push_back(channel_object_allocate(&id_));
         }
 
-        return nullptr;
+        return "";
     });
 
     m_handlers.emplace("threads", [](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
-        -> const char*
+        -> std::string
     {
         if (amount == 0)
         {
@@ -225,11 +225,11 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
             }
         }
 
-        return nullptr;
+        return "";
     });
 
     m_handlers.emplace("image", [](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
-        -> const char*
+        -> std::string
     {
         if (amount == 0)
         {
@@ -302,11 +302,11 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
             l -= size;
         }
 
-        return nullptr;
+        return "";
     });
 
     m_handlers.emplace("thread", [](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
-        -> const char*
+        -> std::string
     {
         if (amount == 0)
         {
@@ -410,7 +410,62 @@ SocketChannelHub::SocketChannelHub(uint16_t port) :
             }
         }
 
-        return nullptr;
+        return "";
+    });
+
+    m_handlers.emplace("post", [](int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)
+        -> std::string
+    {
+        if (amount == 0)
+        {
+            return "channel is not specified";
+        }
+
+        ChannelObject* channel_object = objects[0];
+
+        ChannelId channel = get_string_property(channel_object, 'c');
+        if (channel.empty())
+        {
+            return "Missing channel";
+        }
+
+        BoardId board = get_string_property(channel_object, 'b');
+        if (board.empty())
+        {
+            return "Missing board";
+        }
+
+        std::string comment = get_string_property(channel_object, 'o');
+        if (comment.empty())
+        {
+            return "Missing comment";
+        }
+
+        ThreadId thread = get_string_property(channel_object, 't');
+        PostId replies_to = get_string_property(channel_object, 'r');
+
+        PostResult res {CallbackStatus::failed};
+
+        if (thread.empty())
+        {
+            res.error = "Creating new threads is not implemented yet.";
+        }
+        else
+        {
+            res = Get()->post(client, channel, board, thread, comment, replies_to);
+        }
+
+        if (res.status != CallbackStatus::ok)
+        {
+            return res.error;
+        }
+        else
+        {
+            declare_str_property_on_stack(id_, OBJ_PROPERTY_ID, "OK", nullptr);
+            result.push_back(channel_object_allocate(&id_));
+        }
+
+        return "";
     });
 
 }
@@ -482,14 +537,16 @@ const char* SocketChannelHub::proto_process_cb(int socket, struct proto_process_
     }
 
     std::vector<ChannelObject*> send_back;
-    const char* err = it->second(socket, objects->data(), proto->recv_objects_num, send_back);
+    std::string err = it->second(socket, objects->data(), proto->recv_objects_num, send_back);
 
     delete objects;
 
-    if (err)
+    if (!err.empty())
     {
         std::cout << "Responding with error: " << err << std::endl;
-        return err;
+        static std::string error;
+        error = err;
+        return error.c_str();
     }
 
     if (!send_back.empty())

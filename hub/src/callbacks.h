@@ -60,6 +60,17 @@ typedef struct GetThreadResult {
 } GetThreadResult;
 
 
+typedef struct PostResult {
+    PostResult(CallbackStatus s, const std::string& error) :
+        status(s), error(error) {}
+    PostResult(CallbackStatus s) :
+        status(s), error("") {}
+
+    CallbackStatus status;
+    std::string error;
+} PostResult;
+
+
 typedef struct GetImageResult {
     GetImageResult(CallbackStatus s, const std::vector<uint8_t>* data, uint16_t data_size, uint32_t w, uint32_t h) :
         status(s), data(data), data_size(data_size), w(w), h(h) {}

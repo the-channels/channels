@@ -19,6 +19,8 @@ public:
     GetSettingDefsResult get_setting_defs(int client) override;
     GetChannelThreadsResult get_threads(int client, const BoardId &board) override;
     GetChannelThreadResult get_thread(int client, const BoardId &board, const ThreadId &thread) override;
+    PostResult post(int client, const BoardId &board, const ThreadId &thread, const std::string& comment,
+        const PostId& reply_to) override;
 
     void new_client(int client) override;
     void client_released(int client) override;
@@ -28,7 +30,6 @@ private:
     std::map<int, py::object> m_client_settings;
     std::mutex m_client_settings_mutex;
     py::object m_instance;
-    py::object m_client_class;
 };
 
 #endif

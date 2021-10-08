@@ -50,14 +50,19 @@ class ChannelsError(Exception):
         self.code = code
 
 
+class PostingError(Exception):
+    def __init__(self, message):
+        self.message = message
+
+
 class Client(object):
     """
     A class the represents a connected client. A client could have it's settings, which it can retrieve and update.
     :param id: would be a client's id
     """
-    def __init__(self, channel_name, id):
+    def __init__(self, channel_name, client_id):
         self.channel_name = channel_name
-        self.id = id
+        self.id = client_id
         self.settings = {}
         self.key = None
         self.hashed_key = None
@@ -142,6 +147,19 @@ class Channel(object):
     def get_cache_key(self, key):
         return "cache/" + self.name() + "_" + key
 
+    def new_client(self, client_id):
+        """
+        Called when a new client is initialized. The instance of the object returned will be used on all subsequent
+        methods.
+        """
+        return Client(self.name(), client_id)
+
+    def client_released(self, client):
+        """
+        Called when a client is released. Take care to free any resources that have been allocated.
+        """
+        pass
+
     def get_setting_definitions(self, client):
         """
         This method should return a list of SettingDefinition objects, each defining a particular setting this
@@ -194,6 +212,17 @@ class Channel(object):
         :return: A list of ChannelPost objects for a particular board's thread. Take care to fill object's properties
         """
         raise NotImplementedError()
+
+    def post(self, client, board, thread, comment, reply_to):
+        """
+        Make a new post in an existing thread. No exceptions means success.
+        :param client: a Client instance
+        :param board: a board id (str)
+        :param thread: a thread id (str)
+        :param comment: a comment body (str)
+        :param reply_to: id of the post this post replies to, or "" (str)
+        """
+        raise PostingError("Posting is not implemented on this channel")
 
 
 # noinspection PyUnresolvedReferences

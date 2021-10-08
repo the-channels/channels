@@ -17,8 +17,8 @@ You can do that from the [Releases](https://github.com/the-channels/channels/rel
    library with no executable~~
 2. ~~Ability to save settings~~
 3. ~~Tracking and showing replies to particular post~~
-4. Posting
-5. Optimize font rendering speed
+4. ~~Posting~~
+5. ~~Optimize font rendering speed~~
 6. Cleanup cache after certain timeout
 7. Cache the transcoded images and not only originals
 

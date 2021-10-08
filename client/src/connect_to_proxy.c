@@ -15,7 +15,7 @@ struct scene_objects_t
     struct gui_scene_t scene;
     struct gui_image_t logo;
     struct gui_edit_t connect_address;
-    char connect_address_buff[64];
+    char connect_address_buff[256];
     struct gui_form_t connect_to_proxy;
     struct gui_button_t button_connect;
     struct gui_label_t label_version;

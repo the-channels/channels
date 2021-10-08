@@ -9,20 +9,12 @@
 #include "channels_proto.h"
 #include "channels.h"
 
-enum setting_type_t
-{
-    SETTING_STRING = 0,
-    SETTING_BOOL,
-    SETTING_INT,
-    SETTING_UNKNOWN
-};
-
 struct channel_setting_def_t
 {
     char* id;
     char* description;
     char value[128];
-    struct gui_object_t* editor;
+    struct gui_edit_t* editor;
 };
 
 #define MAX_SETTING_DEFS (8)
@@ -30,6 +22,7 @@ struct channel_setting_def_t
 struct scene_objects_t
 {
     struct gui_scene_t scene;
+    struct gui_label_t warning;
     struct gui_label_t title;
     struct gui_button_t button_back;
     struct gui_button_t button_next;
@@ -115,7 +108,7 @@ static void get_defs_response(struct proto_process_t* proto)
 
             struct gui_edit_t* value_edit = alloc_heap(sizeof(struct gui_edit_t));
             proto_assert_str(description, "Cannot allocate value_edit");
-            def->editor = (struct gui_object_t*)value_edit;
+            def->editor = value_edit;
             zxgui_edit_init(value_edit, get_xywh(0, offset, 30, 2), def->value, 128);
             zxgui_scene_add(&scene_objects->scene, value_edit);
 
@@ -236,6 +229,14 @@ extern void switch_channel_settings_view()
     {
         zxgui_label_init(&scene_objects->title, XYWH(0, 0, 32, 1), scene_objects->label_title, INK_BLACK | PAPER_WHITE, 0);
         zxgui_scene_add(&scene_objects->scene, &scene_objects->title);
+    }
+
+    {
+        zxgui_label_init(&scene_objects->warning, XYWH(0, 21, 32, 2),
+            "WARNING: Settings are sent and stored to the hub in clear text. "
+            "Prefer to run your own hub on your local area network.",
+             BRIGHT | INK_BLACK | PAPER_RED, GUI_FLAG_MULTILINE);
+        zxgui_scene_add(&scene_objects->scene, &scene_objects->warning);
     }
 
     {

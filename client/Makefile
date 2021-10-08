@@ -6,7 +6,7 @@ NETWORK_ENGINE:="spectranet"
 
 PROTO_PATH = $(ROOT_DIR)/../proto
 CHANNELS_LIBS = -llibsocket_np -llibspectranet_np -lgui
-INCLUDE_PATH = /usr/local/share/z88dk/include
+INCLUDE_PATH = -I/usr/local/share/z88dk/include -I/usr/local/share/z88dk/include/arch/zx
 BIN_NAME = channels__.bin
 
 ifeq ($(DEBUG), 1)
@@ -19,11 +19,11 @@ channels_OUT = bin/channels
 ifneq (,$(JUST_PRINT))
 PHONY_OBJS := yes
 CC = gcc
-CFLAGS += -I$(ROOT_DIR)/include/spectranet -I$(INCLUDE_PATH) -I$(ROOT_DIR)/include -I$(ROOT_DIR)/src -I$(ROOT_DIR)/netlog -I$(PROTO_PATH) -D__FASTCALL__="" \
+CFLAGS += -I$(ROOT_DIR)/include/spectranet $(INCLUDE_PATH) -I$(ROOT_DIR)/include -I$(ROOT_DIR)/src -I$(ROOT_DIR)/netlog -I$(PROTO_PATH) -D__FASTCALL__="" \
 	-DCHANNELS_PROTO_CLIENT="1" -D__CALLEE__="" -D__SCCZ80="1" -D__SPECTRUM="1" -D__Z80="1" -D__naked="" -D__z88dk_callee="" -D__z88dk_fastcall="" -D__stdc="" -D__preserves_regs="" -D__LIB__="" -D__no_z88dk_declspec="1"
 else
 CC = zcc
-CFLAGS += $(DFLAGS) -I$(ROOT_DIR)/include/spectranet -L$(ROOT_DIR)/libs -I$(ROOT_DIR)/src -I$(INCLUDE_PATH) -O3 -I$(ROOT_DIR)/include -I$(ROOT_DIR)/netlog -I$(PROTO_PATH) -DCHANNELS_PROTO_CLIENT="1"
+CFLAGS += $(DFLAGS) -I$(ROOT_DIR)/include/spectranet -L$(ROOT_DIR)/libs -I$(ROOT_DIR)/src $(INCLUDE_PATH) -O3 -I$(ROOT_DIR)/include -I$(ROOT_DIR)/netlog -I$(PROTO_PATH) -DCHANNELS_PROTO_CLIENT="1"
 ASMFLAGS =
 ZXFLAGS = +zx
 channels_CFLAGS = -m -zorg=25000 -pragma-redirect=CRT_FONT_64=_fake_CRT_FONT_64 -pragma-include:zpragma.inc \
@@ -31,13 +31,15 @@ channels_CFLAGS = -m -zorg=25000 -pragma-redirect=CRT_FONT_64=_fake_CRT_FONT_64 
 GUI_CFLAGS = -L/usr/local/share/z88dk/lib/clibs
 MODULES_CFLAGS = -L/usr/local/share/z88dk/lib/clibs
 CHANNELS_INSTALLER_CFLAGS = -m -L/usr/local/share/z88dk/lib/clibs -llibspectranet_np -lndos
+ASM_SOURCES = $(wildcard src/*.asm)
 endif
 
 ifeq ($(NETWORK_ENGINE), "spectranet")
 CFLAGS += -D__SPECTRANET="1"
 endif
 
-SOURCES := $(wildcard src/*.c src/*.asm netlog/*.c $(PROTO_PATH)/channels_proto.c $(PROTO_PATH)/proto_objects.c)
+ASM_OBJECTS = $(ASM_SOURCES:.asm=.o)
+SOURCES := $(wildcard src/*.c netlog/*.c $(PROTO_PATH)/channels_proto.c $(PROTO_PATH)/proto_objects.c)
 OBJECTS = $(SOURCES:.c=.o)
 
 GUI_LIB_SOURCES := $(wildcard gui/*.c)
@@ -64,12 +66,12 @@ libs/libspectranet_np.lib: include/spectranet
 
 spectranet-libs: libs/libsocket_np.lib libs/libspectranet_np.lib
 
-bin/channels.tap: spectranet-libs gui-lib bin $(OBJECTS)
-	$(CC) $(ZXFLAGS) $(CFLAGS) -o $(channels_OUT) $(channels_CFLAGS) $(OBJECTS)
+bin/channels.tap: spectranet-libs gui-lib bin $(OBJECTS) $(ASM_OBJECTS)
+	$(CC) $(ZXFLAGS) $(CFLAGS) -o $(channels_OUT) $(channels_CFLAGS) $(OBJECTS) $(ASM_OBJECTS)
 	@cat bin/channels.map | sed -n "s/^\\([a-zA-Z0-9_]*\\).*= .\([A-Z0-9]*\) ; addr.*/\2,\1/p" | sort > bin/channels.map.sorted
 
-bin/channels__.bin: spectranet-libs gui-lib bin $(OBJECTS)
-	$(CC) $(ZXFLAGS) $(CFLAGS) -o $(channels_OUT) $(channels_CFLAGS) $(OBJECTS) -subtype=bin
+bin/channels__.bin: spectranet-libs gui-lib bin $(OBJECTS) $(ASM_OBJECTS)
+	$(CC) $(ZXFLAGS) $(CFLAGS) -o $(channels_OUT) $(channels_CFLAGS) $(OBJECTS) $(ASM_OBJECTS) -subtype=bin
 
 %.o: %.c
 	$(CC) $(ZXFLAGS) $(CFLAGS) -c -o $@ $<
@@ -117,6 +119,7 @@ clean: gui-lib-clean
 
 ifeq ($(PHONY_OBJS),yes)
 .PHONY: $(SOURCES)
+.PHONY: $(GUI_LIB_SOURCES)
 endif
 
 .PHONY: channels modules modules-clean channels-installer-clean clean libs run deploy listen-for-logs get-size

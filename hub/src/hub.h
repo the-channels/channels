@@ -89,10 +89,14 @@ public:
         bool flush);
     GetThreadResult get_thread(int client, const ChannelId &channel, const BoardId &board, const ThreadId &thread,
         bool flush);
+    PostResult post(int client, const ChannelId& channel, const BoardId& board, const ThreadId& thread,
+        const std::string& comment, const PostId& reply_to);
 
     void new_client(int client);
     void client_released(int client);
     void set_key(int client, const std::string& key);
+    void clear_thread_cache(int client, const ChannelId &channel, const BoardId &board, const ThreadId& thread);
+    void clear_catalog_cache(int client, const ChannelId &channel, const BoardId &board);
 
     const std::map<ChannelId, ChannelPtr>& get_channels() const { return m_channels; }
     void register_channel(const ChannelId& channel_id, Channel* ptr);

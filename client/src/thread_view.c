@@ -59,8 +59,12 @@ struct posting_scene_objects_t
     struct gui_scene_t scene;
     struct gui_label_t title;
     struct gui_button_t button_exit;
+    struct gui_button_t button_post;
     struct gui_edit_t post_body;
-    char post_content[1024];
+    char post_content[512];
+    char post_payload[600];
+    char reply_to[48];
+    char reply_to_title[48];
 };
 
 struct scene_objects_t* scene_objects = NULL;
@@ -231,6 +235,7 @@ static void switch_back_to_boards()
 }
 
 static uint8_t request();
+static void alloc_view_objects();
 static void switch_posting_mode();
 
 static void switch_back_to_threads()
@@ -732,7 +737,26 @@ static void key_pressed(int key)
         }
         case 'n':
         {
-            switch_posting_mode();
+            if (post_mode == 0)
+            {
+                channels_set_thread(selected_entry->id);
+                post_mode = 1;
+                entry_offset = 0;
+            }
+
+            switch_posting_mode("");
+            break;
+        }
+        case 'r':
+        {
+            if (post_mode == 0)
+            {
+                channels_set_thread(selected_entry->id);
+                post_mode = 1;
+                entry_offset = 0;
+            }
+
+            switch_posting_mode(selected_entry->id);
             break;
         }
         // select next entry
@@ -821,40 +845,104 @@ static void key_pressed(int key)
 
 static void exit_help(struct gui_button_t* this)
 {
-    switch_back_to_threads();
+    request();
 }
 
 static void exit_posting(struct gui_button_t* this)
 {
-    switch_posting_mode();
+    request();
 }
 
-static void switch_posting_mode()
+static void refresh_thread_view()
+{
+    request();
+}
+
+static void process_posting_entry(ChannelObject* object)
+{
+
+}
+
+static void get_posting_entries_error(const char* error)
+{
+    switch_alert(error, refresh_thread_view);
+}
+
+static void get_posting_response(struct proto_process_t* proto)
+{
+    refresh_thread_view();
+}
+
+static void post_comment(struct gui_button_t* this)
+{
+    declare_str_property_on_stack(key_, OBJ_PROPERTY_ID, "post", NULL);
+    declare_str_property_on_stack(channel_, 'c', channels_get_channel(), &key_);
+    declare_str_property_on_stack(board_, 'b', channels_get_board(), &channel_);
+    declare_str_property_on_stack(thread_, 't', channels_get_thread(), &board_);
+    declare_str_property_on_stack(comment_, 'o', posting_scene_objects->post_content,
+        (post_mode ? &thread_ : &board_));
+    declare_str_property_on_stack(reply_to, 'r', posting_scene_objects->reply_to, &comment_);
+
+    ChannelObject* req = (ChannelObject*)posting_scene_objects->post_payload;
+    channel_object_assign(req, 600, &reply_to);
+
+    if (channels_send_request(req, process_posting_entry, get_posting_response, get_posting_entries_error))
+    {
+        switch_alert("Cannot send a post", refresh_thread_view);
+    }
+
+    switch_progress("Posting...", NULL);
+}
+
+static void switch_posting_mode(const char* reply_to)
 {
     if (requests_locked)
         return;
+
+    static char reply_to_v[48];
+    strcpy(reply_to_v, reply_to);
 
     free_view();
 
     posting_scene_objects = alloc_heap(sizeof(struct posting_scene_objects_t));
     proto_assert_str(posting_scene_objects, "Cannot allocate");
 
+    strcpy(posting_scene_objects->reply_to, reply_to_v);
+
+    if (strlen(reply_to_v) == 0)
+    {
+        strcpy(posting_scene_objects->reply_to_title, "POST");
+    }
+    else
+    {
+        strcpy(posting_scene_objects->reply_to_title, "POST A REPLY TO ");
+        strcat(posting_scene_objects->reply_to_title, reply_to_v);
+    }
+
     zxgui_scene_init(&posting_scene_objects->scene, NULL);
 
     {
-        zxgui_label_init(&posting_scene_objects->title, XYWH(0, 0, 32, 1), "NEW POST", INK_BLACK | PAPER_WHITE, 0);
+        zxgui_label_init(&posting_scene_objects->title, XYWH(0, 0, 32, 1), posting_scene_objects->reply_to_title,
+             INK_BLACK | PAPER_WHITE, 0);
         zxgui_scene_add(&posting_scene_objects->scene, &posting_scene_objects->title);
-    }
-
-    {
-        strcpy(posting_scene_objects->post_content, "");
-        zxgui_edit_init(&posting_scene_objects->post_body, XYWH(0, 1, 31, 21), posting_scene_objects->post_content, 64);
-        zxgui_scene_add(&posting_scene_objects->scene, &posting_scene_objects->post_body);
     }
 
     {
         zxgui_button_init(&posting_scene_objects->button_exit, XYWH(0, 23, 0, 1), 32, GUI_ICON_SPACE, "BACK", exit_posting);
         zxgui_scene_add(&posting_scene_objects->scene, &posting_scene_objects->button_exit);
+        posting_scene_objects->button_exit.flags |= GUI_FLAG_SYM;
+    }
+
+    {
+        zxgui_button_init(&posting_scene_objects->button_post, XYWH(5, 23, 0, 1), 13, GUI_ICON_RETURN, "POST", post_comment);
+        zxgui_scene_add(&posting_scene_objects->scene, &posting_scene_objects->button_post);
+        posting_scene_objects->button_post.flags |= GUI_FLAG_SYM;
+    }
+
+    {
+        strcpy(posting_scene_objects->post_content, "");
+        zxgui_multiline_edit_init(&posting_scene_objects->post_body, XYWH(0, 1, 31, 21), posting_scene_objects->post_content, 1024);
+        zxgui_scene_add(&posting_scene_objects->scene, &posting_scene_objects->post_body);
     }
 
     zxgui_scene_set_focus(&posting_scene_objects->scene, &posting_scene_objects->post_body);
@@ -1173,7 +1261,7 @@ static uint8_t request()
     declare_str_property_on_stack(replies_to, 'r',
         (replies_stack_pointer ? (const char*)replies_stack[replies_stack_pointer - 1].reply_id : ""), &flush_);
 
-    declare_object_on_stack(request, 128, &replies_to);
+    declare_object_on_stack(request, 255, &replies_to);
 
     flush = 0;
     stop_fetching_attachments_and_leave = 0;
@@ -1191,7 +1279,7 @@ static uint8_t request()
         return 1;
     }
 
-    switch_progress("Fetching Threads", NULL);
+    switch_progress(post_mode ? "Fetching Posts" : "Fetching Threads", NULL);
 
     return 0;
 }

@@ -1,8 +1,16 @@
 from channels.base import Channel, ChannelsError, ChannelAttachment, ChannelBoard, ChannelThread
-from channels.base import ChannelPost, SettingDefinition
+from channels.base import ChannelPost, SettingDefinition, Client, PostingError
 
 import requests
 import re
+import urllib
+
+
+class FourChanClient(Client):
+    def __init__(self, channel_name, client_id):
+        super().__init__(channel_name, client_id)
+        self.session = requests.Session()
+        self.authorized = False
 
 
 class FourChanChannel(Channel):
@@ -18,11 +26,33 @@ class FourChanChannel(Channel):
 
     def get_setting_definitions(self, client):
         return [
-            # SettingDefinition("pass", "Pass code for posting"),
+            SettingDefinition("pass", "PASS code for posting"),
+            SettingDefinition("pin", "PIN code for posting"),
         ]
 
+    def new_client(self, client_id):
+        return FourChanClient(self.name(), client_id)
+
+    def authorize(self, client: FourChanClient):
+        if client.authorized:
+            return True
+        if not client.settings.get("pass", None):
+            return False
+        if not client.settings.get("pin", None):
+            return False
+        r = client.session.post("https://sys.4chan.org/auth", data={
+            "act": "do_login",
+            "id": client.settings["pass"],
+            "pin": client.settings["pin"],
+            "long_login": "yes"
+        })
+        if r.status_code == 200:
+            client.authorized = True
+            return True
+        return False
+
     def get_boards(self, client, limit):
-        r = requests.get(FourChanChannel.base_url + "/boards.json")
+        r = client.session.get(FourChanChannel.base_url + "/boards.json")
         if r.status_code != 200:
             raise ChannelsError(ChannelsError.UNKNOWN_ERROR)
         response = r.json()
@@ -34,7 +64,7 @@ class FourChanChannel(Channel):
         return boards
 
     def get_threads(self, client, board):
-        r = requests.get(FourChanChannel.base_url + "/" + board + "/catalog.json")
+        r = client.session.get(FourChanChannel.base_url + "/" + board + "/catalog.json")
         if r.status_code != 200:
             raise ChannelsError(ChannelsError.UNKNOWN_ERROR)
         pages = r.json()
@@ -59,7 +89,7 @@ class FourChanChannel(Channel):
         return threads
 
     def get_thread(self, client, board, thread):
-        r = requests.get(FourChanChannel.base_url + "/" + board + "/thread/" + thread + ".json")
+        r = client.session.get(FourChanChannel.base_url + "/" + board + "/thread/" + thread + ".json")
         if r.status_code != 200:
             raise ChannelsError(ChannelsError.UNKNOWN_ERROR)
         result = r.json()
@@ -94,6 +124,22 @@ class FourChanChannel(Channel):
                 posts_by_id[result_post.id] = result_post
 
         return posts
+
+    def post(self, client, board, thread, comment, reply_to):
+        if not self.authorize(client):
+            raise PostingError("Cannot authorize. Provide a valid PASS and PIN.")
+
+        if reply_to:
+            comment = ">>{0}\n{1}".format(reply_to, comment)
+
+        r = client.session.post("https://sys.4chan.org/{0}/post".format(board), data={
+            "mode": "regist",
+            "resto": thread,
+            "com": comment
+        })
+
+        if r.status_code != 200:
+            raise PostingError("Cannot post: {0}. Is your PASS valid?".format(r.status_code))
 
 
 CHANNEL_NAME = "4chan"

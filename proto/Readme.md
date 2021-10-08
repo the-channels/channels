@@ -269,3 +269,38 @@ Each setting SHOULD contain the following:
 | OBJ_PROPERTY_TITLE | Setting description |
 | `t`             | Setting type (e.g. `string`, `bool` or `int`) |
 
+
+## Update Current Client's Settings
+
+```c
+-> [{
+    OBJ_PROPERTY_ID "save_settings"
+    OBJ_PROPERTY_PAYLOAD "key1=value1"
+    OBJ_PROPERTY_PAYLOAD "key2=value2"
+    ...
+}]
+<- []
+```
+
+This call should update current client's settings. Keys are according to `setting_defs` above.
+
+Each setting SHOULD contain be a `OBJ_PROPERTY_PAYLOAD` with value of `setting_key=setting_value`:
+
+## Post a comment
+
+```c
+-> [{
+    OBJ_PROPERTY_ID "post"
+    'c' "<channel>"
+    'b' "<board>"
+    't' "<thread>" (optional)
+    'o' "<comment>"
+    'r' "<reply_to>" (optional)
+}]
+<- []
+```
+
+This call should post a new comment on existing thread, when such a key is provided (`t`) or create a new thread
+with specified comment if it is not. The credentials that are necessary to make such post should be provided through the
+`save_settings` call prior to posting.
+

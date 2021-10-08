@@ -8,8 +8,6 @@ PythonChannel::PythonChannel(const std::string& id, const std::string& title, co
     // allocate a instance
     m_instance = clazz();
     m_instance.inc_ref();
-
-    m_client_class = getattr(py::module_::import("channels.base"), "Client");
 }
 
 CallbackStatus PythonChannel::get_attachment(int client, const std::string& url, std::string& fout)
@@ -205,6 +203,29 @@ GetChannelThreadResult PythonChannel::get_thread(int client, const BoardId &boar
     }
 }
 
+PostResult PythonChannel::post(int client, const BoardId &board, const ThreadId &thread, const std::string& comment,
+    const PostId& reply_to)
+{
+    py::gil_scoped_acquire acquire;
+
+    try
+    {
+        m_instance.attr("post")(m_client_settings[client], board, thread, comment, reply_to);
+        return PostResult(CallbackStatus::ok);
+    }
+    catch (py::error_already_set &e)
+    {
+        std::cerr << e.what() << std::endl;
+
+        const py::object& v = e.value();
+        if (hasattr(v, "message"))
+        {
+            return PostResult(CallbackStatus::failed, py::cast<std::string>(e.value().attr("message")));
+        }
+        return PostResult(CallbackStatus::failed, "Failed to post");
+    }
+}
+
 void PythonChannel::set_key(int client, const std::string& key)
 {
     py::gil_scoped_acquire acquire;
@@ -229,13 +250,14 @@ void PythonChannel::new_client(int client)
     py::gil_scoped_acquire acquire;
     std::lock_guard<std::mutex> guard(m_client_settings_mutex);
 
-    m_client_settings[client] = m_client_class(get_name(), client);
+    m_client_settings[client] = m_instance.attr("new_client")(client);
 }
 
 void PythonChannel::client_released(int client)
 {
     py::gil_scoped_acquire acquire;
     std::lock_guard<std::mutex> guard(m_client_settings_mutex);
+    m_instance.attr("client_released")(m_client_settings[client]);
 
     auto f = m_client_settings.find(client);
     if (f != m_client_settings.end())

@@ -50,19 +50,18 @@ add_subdirectory(pybind11)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
-if(${CMAKE_BUILD_TYPE} MATCHES Debug)
-    set(CHANNELS_INSTALL_METHOD develop)
+if(SKIP_PACKAGE_DEVELOP)
+    message(WARNING "Skipped setup.py develop")
 else()
-    set(CHANNELS_INSTALL_METHOD install)
+    add_custom_target(
+        channel_packages
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/channels/setup.py develop
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/channels
+        COMMENT "Installing channels develop)"
+    )
+    add_dependencies(channels_hub channel_packages)
 endif()
 
-add_custom_target(
-    channel_packages
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/channels/setup.py ${CHANNELS_INSTALL_METHOD}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/channels
-    COMMENT "Installing channels (${CHANNELS_INSTALL_METHOD})"
-)
-
-add_dependencies(channels_hub img2spec_static copy_configurations create_cache_folder channel_packages)
+add_dependencies(channels_hub img2spec_static copy_configurations create_cache_folder)
 
 target_link_libraries(channels_hub img2spec_static pybind11::embed)

@@ -3,6 +3,7 @@
 #include "zxgui.h"
 #include <spectrum.h>
 #include <text_ui.h>
+#include <input.h>
 
 static void _button_render(uint8_t x, uint8_t y, struct gui_button_t* this, struct gui_scene_t* scene)
 {
@@ -17,6 +18,12 @@ static void _button_render(uint8_t x, uint8_t y, struct gui_button_t* this, stru
     if (is_object_invalidated(this))
     {
         zxgui_screen_color(INK_WHITE | BRIGHT | PAPER_BLACK);
+        if (this->flags & GUI_FLAG_SYM)
+        {
+            zxgui_screen_put(x, y, GUI_ICON_SYM);
+            x++;
+        }
+
         zxgui_screen_put(x, y, this->icon);
 
         if (this->title)
@@ -38,6 +45,13 @@ static uint8_t _button_event(enum gui_event_type event_type, void* event, struct
             struct gui_event_key_pressed* ev = event;
             if (ev->key == this->key)
             {
+                if (this->flags & GUI_FLAG_SYM)
+                {
+                    if (in_KeyPressed(0x4000) == 0)
+                    {
+                        break;
+                    }
+                }
                 if (this->pressed)
                 {
                     this->pressed(this);

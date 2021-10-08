@@ -23,6 +23,8 @@ public:
     virtual void set_settings(int client, const std::unordered_map<std::string, std::string>& s) = 0;
     virtual GetChannelThreadsResult get_threads(int client, const BoardId &board) = 0;
     virtual GetChannelThreadResult get_thread(int client, const BoardId &board, const ThreadId &thread) = 0;
+    virtual PostResult post(int client, const BoardId &board, const ThreadId &thread, const std::string& comment,
+        const PostId& reply_to) = 0;
     virtual void new_client(int client) {}
     virtual void set_key(int client, const std::string& key) {}
     virtual void client_released(int client) {}

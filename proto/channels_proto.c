@@ -180,7 +180,7 @@ static uint8_t process(int socket, struct proto_process_t* proto,
                         if (err)
                         {
                             declare_str_property_on_stack(error, OBJ_PROPERTY_ERROR, err, NULL);
-                            declare_object_on_stack(response_object, 128, &error);
+                            declare_object_on_stack(response_object, 256, &error);
 
                             ChannelObject* objs[1];
                             objs[0] = response_object;

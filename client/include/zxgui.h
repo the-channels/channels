@@ -62,6 +62,7 @@ enum gui_tiles {
     GUI_ICON_QUESTION,
     GUI_ICON_R,
     GUI_ICON_N,
+    GUI_ICON_SYM,
 };
 
 enum gui_event_type {
@@ -70,7 +71,7 @@ enum gui_event_type {
 
 struct gui_event_key_pressed
 {
-    uint8_t key;
+    char key;
 };
 
 struct gui_object_t;
@@ -83,6 +84,7 @@ typedef uint8_t (*gui_event_f)(enum gui_event_type event_type, void* event, stru
 #define GUI_FLAG_DIRTY_INTERNAL (0x02u)
 #define GUI_FLAG_MULTILINE (0x04u)
 #define GUI_FLAG_HIDDEN (0x08u)
+#define GUI_FLAG_SYM (0x10u)
 
 #define GUI_OBJECT_BASE uint8_t x; \
                         uint8_t y; \
@@ -129,8 +131,12 @@ struct gui_form_t
 struct gui_edit_t
 {
     GUI_OBJECT_BASE;
-    char* value;
+    uint8_t* cursor_pixels_addr;
+    uint8_t* cursor_color_addr;
+    uint8_t cursor_even;
+    uint8_t last_text_height;
     uint16_t value_size;
+    char* value;
 };
 
 struct gui_select_t;
@@ -247,8 +253,8 @@ void zxgui_base_init(void* o, xywh_t xywh, void* render, void* event) ZXGUI_CDEC
 
 void zxgui_form_init(struct gui_form_t* form, xywh_t xywh, const char* title, uint8_t style) ZXGUI_CDECL;
 void zxgui_form_add_child(struct gui_form_t* form, void* child) ZXGUI_CDECL;
-void zxgui_edit_init(struct gui_edit_t* edit, xywh_t xywh,
-    char* buffer, uint16_t buffer_size) ZXGUI_CDECL;
+void zxgui_edit_init(struct gui_edit_t* edit, xywh_t xywh, char* buffer, uint16_t buffer_size) ZXGUI_CDECL;
+void zxgui_multiline_edit_init(struct gui_edit_t* edit, xywh_t xywh, char* buffer, uint16_t buffer_size) ZXGUI_CDECL;
 void zxgui_select_init(struct gui_select_t* select, xywh_t xywh,
     gui_select_obtain_data_f obtain_data, void* user,
     gui_select_selected selected) ZXGUI_CDECL;

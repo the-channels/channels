@@ -85,6 +85,16 @@ void ChannelHub::client_released(int client)
     }
 }
 
+void ChannelHub::clear_thread_cache(int client, const ChannelId &channel, const BoardId &board, const ThreadId& thread)
+{
+    m_thread_cache.erase({client, channel, board, thread});
+}
+
+void ChannelHub::clear_catalog_cache(int client, const ChannelId &channel, const BoardId &board)
+{
+    m_catalog_cache.erase({client, channel, board});
+}
+
 const ChannelPtr& ChannelHub::get_channel(const ChannelId& channel) const
 {
     static ChannelPtr null_channel = ChannelPtr();
@@ -252,4 +262,28 @@ GetThreadResult ChannelHub::get_thread(
     {
         return GetThreadResult(res.status);
     }
+}
+
+PostResult ChannelHub::post(int client, const ChannelId& channel, const BoardId& board, const ThreadId& thread,
+    const std::string& comment, const PostId& reply_to)
+{
+    const ChannelPtr& ch = get_channel(channel);
+    if (ch == nullptr)
+    {
+        return PostResult(CallbackStatus::unknown_resource, "No such channel");
+    }
+
+    PostResult res = ch->post(client, board, thread, comment, reply_to);
+    if (res.status == CallbackStatus::ok)
+    {
+        if (thread.empty())
+        {
+            clear_catalog_cache(client, channel, board);
+        }
+        else
+        {
+            clear_thread_cache(client, channel, board, thread);
+        }
+    }
+    return res;
 }

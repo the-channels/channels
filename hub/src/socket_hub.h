@@ -8,7 +8,7 @@
 class SocketChannelHub: public ChannelHub
 {
 public:
-    typedef std::function<const char* (int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)> ApiCallHandler;
+    typedef std::function<std::string (int client, ChannelObject** objects, uint8_t amount, std::vector<ChannelObject*>& result)> ApiCallHandler;
 public:
     SocketChannelHub(uint16_t port);
     int run() override;

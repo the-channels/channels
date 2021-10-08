@@ -1,1 +1,1 @@
-#define CHANNELS_VERSION "v0.4"
+#define CHANNELS_VERSION "v0.5"
