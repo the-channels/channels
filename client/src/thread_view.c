@@ -52,6 +52,9 @@ struct help_scene_objects_t
     struct gui_button_t prev_thread_7;
     struct gui_button_t button_reply;
     struct gui_button_t button_new_post;
+    struct gui_button_t button_refresh;
+    struct gui_button_t button_top;
+    struct gui_button_t button_bottom;
 };
 
 struct posting_scene_objects_t
@@ -237,6 +240,7 @@ static void switch_back_to_boards()
 static uint8_t request();
 static void alloc_view_objects();
 static void switch_posting_mode();
+static void flush_and_request();
 
 static void switch_back_to_threads()
 {
@@ -790,6 +794,41 @@ static void key_pressed(int key)
             }
             break;
         }
+        case '5':
+        {
+            auto_select_last = 1;
+            if (num_entries_total > ENTRIES_PER_REQUEST)
+            {
+                entry_offset = num_entries_total - ENTRIES_PER_REQUEST;
+            }
+            else
+            {
+                entry_offset = 0;
+            }
+            flush_and_request();
+            break;
+        }
+        case 't':
+        {
+            auto_select_last = 0;
+            entry_offset = 0;
+            request();
+            break;
+        }
+        case 'b':
+        {
+            auto_select_last = 1;
+            if (num_entries_total > ENTRIES_PER_REQUEST)
+            {
+                entry_offset = num_entries_total - ENTRIES_PER_REQUEST;
+            }
+            else
+            {
+                entry_offset = 0;
+            }
+            request();
+            break;
+        }
         // select prev entry
         case 11:
         case '7':
@@ -972,38 +1011,53 @@ static void switch_help(struct gui_button_t* this)
     }
 
     {
-        zxgui_button_init(&help_scene_objects->button_picture, XYWH(1, 3, 0, 1), 'p', GUI_ICON_P, "Open PICTURE to a THREAD or a POST", NULL);
+        zxgui_button_init(&help_scene_objects->button_picture, XYWH(1, 2, 0, 1), 'p', GUI_ICON_P, "Open PICTURE to a THREAD or a POST", NULL);
         zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->button_picture);
     }
 
     {
-        zxgui_button_init(&help_scene_objects->next_thread, XYWH(1, 5, 1, 1), 10, GUI_ICON_MORE_TO_FOLLOW, NULL, NULL);
+        zxgui_button_init(&help_scene_objects->next_thread, XYWH(1, 3, 1, 1), 10, GUI_ICON_MORE_TO_FOLLOW, NULL, NULL);
         zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->next_thread);
     }
 
     {
-        zxgui_button_init(&help_scene_objects->next_thread_6, XYWH(2, 5, 4, 1), '6', GUI_ICON_6, "SELECT NEXT ENTRY", NULL);
+        zxgui_button_init(&help_scene_objects->next_thread_6, XYWH(2, 3, 4, 1), '6', GUI_ICON_6, "SELECT NEXT ENTRY", NULL);
         zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->next_thread_6);
     }
 
     {
-        zxgui_button_init(&help_scene_objects->prev_thread, XYWH(1, 7, 1, 1), 11, GUI_ICON_LESS_TO_FOLLOW, NULL, NULL);
+        zxgui_button_init(&help_scene_objects->prev_thread, XYWH(1, 4, 1, 1), 11, GUI_ICON_LESS_TO_FOLLOW, NULL, NULL);
         zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->prev_thread);
     }
 
     {
-        zxgui_button_init(&help_scene_objects->prev_thread_7, XYWH(2, 7, 4, 1), '7', GUI_ICON_7, "SELECT PREV ENTRY", NULL);
+        zxgui_button_init(&help_scene_objects->prev_thread_7, XYWH(2, 4, 4, 1), '7', GUI_ICON_7, "SELECT PREV ENTRY", NULL);
         zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->prev_thread_7);
     }
 
     {
-        zxgui_button_init(&help_scene_objects->button_reply, XYWH(1, 9, 0, 1), 'r', GUI_ICON_R, "Reply to a POST", NULL);
+        zxgui_button_init(&help_scene_objects->button_reply, XYWH(1, 5, 0, 1), 'r', GUI_ICON_R, "Reply to a POST", NULL);
         zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->button_reply);
     }
 
     {
-        zxgui_button_init(&help_scene_objects->button_new_post, XYWH(1, 11, 0, 1), 'n', GUI_ICON_N, "New POST to a THREAD", NULL);
+        zxgui_button_init(&help_scene_objects->button_new_post, XYWH(1, 6, 0, 1), 'n', GUI_ICON_N, "New POST to a THREAD", NULL);
         zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->button_new_post);
+    }
+
+    {
+        zxgui_button_init(&help_scene_objects->button_refresh, XYWH(1, 7, 0, 1), '5', GUI_ICON_5, "Refresh", NULL);
+        zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->button_refresh);
+    }
+
+    {
+        zxgui_button_init(&help_scene_objects->button_top, XYWH(1, 8, 0, 1), 't', GUI_ICON_T, "Go TOP", NULL);
+        zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->button_top);
+    }
+
+    {
+        zxgui_button_init(&help_scene_objects->button_bottom, XYWH(1, 9, 0, 1), 'b', GUI_ICON_B, "Go BOTTOM", NULL);
+        zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->button_bottom);
     }
 
     zxgui_scene_set(&help_scene_objects->help_scene);
@@ -1284,13 +1338,10 @@ static uint8_t request()
     return 0;
 }
 
-void switch_thread_view()
+static void flush_and_request()
 {
-    entry_offset = 0;
-    auto_select_last = 0;
     requests_locked = 0;
     flush = 1;
-    post_mode = 0;
 
     selected_entry = NULL;
     first_display_entry = NULL;
@@ -1299,4 +1350,12 @@ void switch_thread_view()
     attachment_being_requested = NULL;
 
     request();
+}
+
+void switch_thread_view()
+{
+    post_mode = 0;
+    entry_offset = 0;
+    auto_select_last = 0;
+    flush_and_request();
 }

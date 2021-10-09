@@ -63,6 +63,9 @@ enum gui_tiles {
     GUI_ICON_R,
     GUI_ICON_N,
     GUI_ICON_SYM,
+    GUI_ICON_5,
+    GUI_ICON_T,
+    GUI_ICON_B,
 };
 
 enum gui_event_type {
