@@ -6,11 +6,19 @@ https://user-images.githubusercontent.com/1666014/126671608-02e74708-55c7-4141-b
 
 ## Download
 
-You can do that from the [Releases](https://github.com/the-channels/channels/releases) page.
+You can do that from the [Releases](https://github.com/the-channels/channels/releases) page 
+or simply tune in TNFS to `zx.desertkun.in` as described [Here](https://channels.desertkun.in/#public-tnfs)
 
-## Requirements
-* Because speccy does not support any internet connectivity by default, you'll need [Spectranet Cartridge](https://www.bytedelight.com/?page_id=3515). It may be pricey and hard to get, but please support the manufacturer as it's a very Niche product.
-* [Fuse Emulator](http://fuse-emulator.sourceforge.net/) supports such cartrige, you'll just need to enable it via "Peripherials->Spectranet" radio button
+## Emulation
+| Emulator | How To Enable           |
+|------------|-------------------------|
+| [Es.pectrum](https://www.habisoft.com/espectrum/EN.htm#Descargas) (Windows)  | Select, Options->Hardware, check "Spectranet", do steps described above |
+| [Fuse Emulator](http://fuse-emulator.sourceforge.net/)   | Peripherials->Spectranet, open snapshot (see Releases), NMI->Configure network->Change IP & Gateway, do steps described above |
+
+## Required hardware
+Because speccy does not support any internet connectivity by default, with physical device
+you'll need [Spectranet Cartridge](https://www.bytedelight.com/?page_id=3515).
+It may be pricey and hard to get, but please support the manufacturer as it's a very Niche product.
 
 ## To Do List
 1. ~~Refactor img2spec tool and split display and processing logic in separate static
