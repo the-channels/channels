@@ -2,43 +2,76 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 JUST_PRINT := $(findstring n,$(MAKEFLAGS))
 TARGET := sccz80
-NETWORK_ENGINE:="spectranet"
+ARCH := zx
 
 PROTO_PATH = $(ROOT_DIR)/../proto
-CHANNELS_LIBS = -llibsocket_np -llibspectranet_np -lgui
-INCLUDE_PATH = -I/usr/local/share/z88dk/include -I/usr/local/share/z88dk/include/arch/zx
+CHANNELS_LIBS = -lgui
 BIN_NAME = channels__.bin
+LIBS_SUFFIX = .lib
+
+channels_OUT = bin/channels
+
+ifeq ($(ARCH),zx)
+
+ifneq (,$(JUST_PRINT))
+	PHONY_OBJS := yes
+	CC = gcc
+	LIB_LD = ar
+else
+	LIB_LD = zcc
+	CC = zcc
+	LIB_LDFLAGS += +zx -x -o
+	ASMFLAGS = +zx
+	CFLAGS += +zx
+	CHANNELS_CFLAGS_PREFIX = +zx
+	CHANNELS_CFLAGS = -m -zorg=25000 -L$(ROOT_DIR)/libs -pragma-redirect=CRT_FONT_64=_fake_CRT_FONT_64 -pragma-include:zpragma.inc \
+	 -L/usr/local/share/z88dk/lib/clibs $(COMPILER_LIBS) -llibsocket_np -llibspectranet_np $(CHANNELS_LIBS) -create-app $(SUBTYPE)
+	GUI_CFLAGS = -L$(ROOT_DIR)/libs -L/usr/local/share/z88dk/lib/clibs
+	CHANNELS_INSTALLER_CFLAGS = -m -L/usr/local/share/z88dk/lib/clibs -llibspectranet_np -lndos
+endif
+
+INCLUDE_PATH = -I/usr/local/share/z88dk/include -I/usr/local/share/z88dk/include/arch/zx
+ARCH_TARGETS += spectranet-libs
+CHANNELS_TARGETS += channels-zx-bin channels-zx-tap
+CFLAGS += -D__SPECTRUM="1" -I$(ROOT_DIR)/include/spectranet $(INCLUDE_PATH)
+ARCH_C_SOURCES = $(wildcard arch/zx/*.c)
+ARCH_ASM_SOURCES = $(wildcard arch/zx/*.asm)
+
+else
+CFLAGS += -D__CALLEE__="" -D__SCCZ80="1" -D__Z80="1" -D__naked="" -D__z88dk_callee="" -D__z88dk_fastcall="" -D__stdc="" -D__preserves_regs="" -D__LIB__="" -D__no_z88dk_declspec="1"
+endif
+
+ifeq ($(ARCH),desktop)
+CFLAGS += -D__DESKTOP="1"
+CHANNELS_TARGETS += channels-desktop-bin
+CC = gcc
+LIB_LD = ar
+LIB_LDFLAGS = rvs
+ARCH_C_SOURCES = $(wildcard arch/desktop/*.c)
+CHANNELS_CFLAGS = -L$(ROOT_DIR)/libs $(CHANNELS_LIBS)
+LIBS_SUFFIX = .a
+LIBS_PREFIX = lib
+endif
+
+ifneq (,$(JUST_PRINT))
+CFLAGS += -I$(ROOT_DIR)/include -I$(ROOT_DIR)/src -I$(ROOT_DIR)/netlog -I$(PROTO_PATH) -D__FASTCALL__="" \
+	-DCHANNELS_PROTO_CLIENT="1" -D__CALLEE__="" -D__SCCZ80="1" -D__Z80="1" -D__naked="" -D__z88dk_callee="" -D__z88dk_fastcall="" -D__stdc="" -D__preserves_regs="" -D__LIB__="" -D__no_z88dk_declspec="1"
+else
+CFLAGS += $(DFLAGS) -I$(ROOT_DIR)/src -O3 -I$(ROOT_DIR)/include -I$(ROOT_DIR)/netlog -I$(PROTO_PATH) -DCHANNELS_PROTO_CLIENT="1"
+endif
 
 ifeq ($(DEBUG), 1)
+ifeq ($(ARCH),zx)
 CFLAGS += -debug
+else
+CFLAGS += -g -O0
+endif
 else
 CFLAGS += -DNDEBUG="1"
 endif
 
-channels_OUT = bin/channels
-ifneq (,$(JUST_PRINT))
-PHONY_OBJS := yes
-CC = gcc
-CFLAGS += -I$(ROOT_DIR)/include/spectranet $(INCLUDE_PATH) -I$(ROOT_DIR)/include -I$(ROOT_DIR)/src -I$(ROOT_DIR)/netlog -I$(PROTO_PATH) -D__FASTCALL__="" \
-	-DCHANNELS_PROTO_CLIENT="1" -D__CALLEE__="" -D__SCCZ80="1" -D__SPECTRUM="1" -D__Z80="1" -D__naked="" -D__z88dk_callee="" -D__z88dk_fastcall="" -D__stdc="" -D__preserves_regs="" -D__LIB__="" -D__no_z88dk_declspec="1"
-else
-CC = zcc
-CFLAGS += $(DFLAGS) -I$(ROOT_DIR)/include/spectranet -L$(ROOT_DIR)/libs -I$(ROOT_DIR)/src $(INCLUDE_PATH) -O3 -I$(ROOT_DIR)/include -I$(ROOT_DIR)/netlog -I$(PROTO_PATH) -DCHANNELS_PROTO_CLIENT="1"
-ASMFLAGS =
-ZXFLAGS = +zx
-channels_CFLAGS = -m -zorg=25000 -pragma-redirect=CRT_FONT_64=_fake_CRT_FONT_64 -pragma-include:zpragma.inc \
- -L/usr/local/share/z88dk/lib/clibs $(COMPILER_LIBS) $(CHANNELS_LIBS) -create-app $(SUBTYPE)
-GUI_CFLAGS = -L/usr/local/share/z88dk/lib/clibs
-MODULES_CFLAGS = -L/usr/local/share/z88dk/lib/clibs
-CHANNELS_INSTALLER_CFLAGS = -m -L/usr/local/share/z88dk/lib/clibs -llibspectranet_np -lndos
-ASM_SOURCES = $(wildcard src/*.asm)
-endif
+ARCH_OBJECTS = $(ARCH_C_SOURCES:.c=.o) $(ARCH_ASM_SOURCES:.asm=.o)
 
-ifeq ($(NETWORK_ENGINE), "spectranet")
-CFLAGS += -D__SPECTRANET="1"
-endif
-
-ASM_OBJECTS = $(ASM_SOURCES:.asm=.o)
 SOURCES := $(wildcard src/*.c netlog/*.c $(PROTO_PATH)/channels_proto.c $(PROTO_PATH)/proto_objects.c)
 OBJECTS = $(SOURCES:.c=.o)
 
@@ -47,10 +80,10 @@ GUI_LIB_OBJECTS = $(GUI_LIB_SOURCES:.c=.o)
 
 all: channels
 
-libs/gui.lib: $(GUI_LIB_OBJECTS)
-	$(CC) $(ZXFLAGS) $(CFLAGS) -x -o $@ $(GUI_CFLAGS) $(GUI_LIB_OBJECTS)
+libs/$(LIBS_PREFIX)gui$(LIBS_SUFFIX): $(GUI_LIB_OBJECTS)
+	$(LIB_LD) $(LIB_LDFLAGS) $@ $(GUI_CFLAGS) $(GUI_LIB_OBJECTS)
 
-gui-lib: libs/gui.lib
+gui-lib: libs/$(LIBS_PREFIX)gui$(LIBS_SUFFIX)
 
 gui-lib-clean:
 	@rm -f gui/*.o
@@ -66,27 +99,32 @@ libs/libspectranet_np.lib: include/spectranet
 
 spectranet-libs: libs/libsocket_np.lib libs/libspectranet_np.lib
 
-bin/channels.tap: spectranet-libs gui-lib bin $(OBJECTS) $(ASM_OBJECTS)
-	$(CC) $(ZXFLAGS) $(CFLAGS) -o $(channels_OUT) $(channels_CFLAGS) $(OBJECTS) $(ASM_OBJECTS)
+bin/channels.tap: $(ARCH_TARGETS) gui-lib bin $(OBJECTS) $(ARCH_OBJECTS)
+	$(CC) $(CHANNELS_CFLAGS_PREFIX) -o $(channels_OUT) $(OBJECTS) $(ARCH_OBJECTS) $(CHANNELS_CFLAGS)
 	@cat bin/channels.map | sed -n "s/^\\([a-zA-Z0-9_]*\\).*= .\([A-Z0-9]*\) ; addr.*/\2,\1/p" | sort > bin/channels.map.sorted
 
-bin/channels__.bin: spectranet-libs gui-lib bin $(OBJECTS) $(ASM_OBJECTS)
-	$(CC) $(ZXFLAGS) $(CFLAGS) -o $(channels_OUT) $(channels_CFLAGS) $(OBJECTS) $(ASM_OBJECTS) -subtype=bin
+bin/channels__.bin: $(ARCH_TARGETS) gui-lib bin $(OBJECTS) $(ARCH_OBJECTS)
+	$(CC) $(CHANNELS_CFLAGS_PREFIX) -o $(channels_OUT) $(OBJECTS) $(ARCH_OBJECTS) $(CHANNELS_CFLAGS) -subtype=bin
+
+bin/channels: $(ARCH_TARGETS) gui-lib bin $(OBJECTS) $(ARCH_OBJECTS)
+	$(CC) $(CHANNELS_CFLAGS_PREFIX) -o $(channels_OUT) $(OBJECTS) $(ARCH_OBJECTS) $(CHANNELS_CFLAGS)
 
 %.o: %.c
-	$(CC) $(ZXFLAGS) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 %.o: %.asm
-	$(CC) $(ZXFLAGS) $(ASMFLAGS) -c -o $@ $<
+	$(CC) $(ASMFLAGS) -c -o $@ $<
 
 bin:
 	@mkdir -p bin
 
-channels: channels-bin channels-tap
-channels-bin: bin/channels__.bin
-channels-tap: bin/channels.tap
+channels: $(CHANNELS_TARGETS)
 
-boot-zx: channels-bin
+channels-zx-bin: bin/channels__.bin
+channels-zx-tap: bin/channels.tap
+channels-desktop-bin: bin/channels
+
+boot-zx: channels-zx-bin
 	cp boot/boot.zx bin/boot.zx
 
 run: bin/channels.tap
@@ -96,7 +134,7 @@ listen-for-logs:
 	@nc -kluvw 0 9468
 
 get-size:
-	@cat bin/channels.map | sed -n "s/^\\([a-zA-Z0-9_]*\\).*= .\([A-Z0-9]*\) ; addr.*/\2,\1/p" | sort | python3 tools/symbol_sizes.py
+	@cat bin/channels.map | sed -n "s/^\\([a-zA-Z0-9_]*\\).*= .\([A-Z0-9]*\) ;.*/\2,\1/p" | sort | python3 tools/symbol_sizes.py
 
 clean: gui-lib-clean
 	make -C spectranet/socklib clean
@@ -107,6 +145,7 @@ clean: gui-lib-clean
 	@rm -f src/*.c.sym
 	@rm -rf include/spectranet
 	@rm -f libs/*.lib
+	@rm -f libs/*.a
 	@rm -f netlog/*.o
 	@rm -f netlog/*.o.asm
 	@rm -f netlog/*.c.sym
@@ -116,10 +155,13 @@ clean: gui-lib-clean
 	@rm -f log/*.c.sym
 	@rm -f channels_proto/*.o
 	@rm -f channels_proto/*.c.sym
+	@rm -f arch/*/*.o
 
 ifeq ($(PHONY_OBJS),yes)
 .PHONY: $(SOURCES)
 .PHONY: $(GUI_LIB_SOURCES)
+.PHONY: $(ARCH_C_SOURCES)
+.PHONY: $(ARCH_ASM_SOURCES)
 endif
 
 .PHONY: channels modules modules-clean channels-installer-clean clean libs run deploy listen-for-logs get-size

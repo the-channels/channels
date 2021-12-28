@@ -3,7 +3,7 @@
 #include "zxgui.h"
 #include <text_ui.h>
 #include <stdint.h>
-#include <spectrum.h>
+#include "system.h"
 #include <ctype.h>
 
 static void _select_render(uint8_t x, uint8_t y, struct gui_select_t* this, struct gui_scene_t* scene)
@@ -17,9 +17,9 @@ static void _select_render(uint8_t x, uint8_t y, struct gui_select_t* this, stru
 
     this->obtain_data(this);
 
-    uint8_t focus = this == scene->focus;
-    uint8_t color = focus ? INK_YELLOW | BRIGHT | PAPER_BLACK : INK_WHITE | PAPER_BLACK;
-    uint8_t color_inv = focus ? INK_BLACK | BRIGHT | PAPER_YELLOW : INK_BLACK | PAPER_WHITE;
+    uint8_t focus = (struct gui_object_t*)this == scene->focus;
+    uint8_t color = focus ? COLOR_FG_YELLOW | COLOR_BRIGHT | COLOR_BG_BLACK : COLOR_FG_WHITE | COLOR_BG_BLACK;
+    uint8_t color_inv = focus ? COLOR_FG_BLACK | COLOR_BRIGHT | COLOR_BG_YELLOW : COLOR_FG_BLACK | COLOR_BG_WHITE;
 
     if (flags & GUI_FLAG_DIRTY)
     {
@@ -98,7 +98,11 @@ static void _select_render(uint8_t x, uint8_t y, struct gui_select_t* this, stru
             }
 
             uint8_t len = strlen(o->value);
+#if CHARACTERS_PER_CELL == (2)
             if (len > (ww << 1)) len = ww << 1;
+#else
+            if (len > ww) len = ww;
+#endif
             text_ui_write_at(x + 1, y + offset, o->value, len);
 
             offset++;
@@ -150,7 +154,7 @@ static uint8_t _select_event(enum gui_event_type event_type, void* event, struct
 
             switch (ev->key)
             {
-                case 11:
+                case GUI_KEY_CODE_UP:
                 {
                     if (this->selection->prev)
                     {
@@ -158,7 +162,7 @@ static uint8_t _select_event(enum gui_event_type event_type, void* event, struct
                     }
                     break;
                 }
-                case 10:
+                case GUI_KEY_CODE_DOWN:
                 {
                     if (this->selection->next)
                     {

@@ -1,20 +1,20 @@
 #include "zxgui.h"
+#include "system.h"
 
 typedef uint8_t uchar;
 
 #include <stdint.h>
 #include <string.h>
-#include <spectrum.h>
+#include "system.h"
 #include <text_ui.h>
-#include "zxgui_tiles.h"
+
+uint8_t screen_color = 0;
 
 void zxgui_init(void)
 {
     text_ui_init();
-
-    zx_border(INK_BLACK);
-    zx_colour(BRIGHT | INK_GREEN | PAPER_BLACK);
-    zx_cls();
+    set_border_color(COLOR_FG_BLACK);
+    clear_screen_with(COLOR_BRIGHT | COLOR_FG_GREEN | COLOR_BG_BLACK);
 }
 
 xywh_t get_xywh(uint8_t x, uint8_t y, uint8_t w, uint8_t h) __z88dk_callee
@@ -46,39 +46,6 @@ void zxgui_icon(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t h, 
             zxgui_screen_put(i, j, *source++);
         }
     }
-}
-
-void zxgui_image(uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* source, const uint8_t* colors) __z88dk_callee
-{
-    for (uint8_t j = y; j < y + h; j++)
-    {
-        for (uint8_t i = x; i < x + w; i++)
-        {
-            uint8_t* addr = zx_cxy2saddr(i, j);
-
-            for (uint8_t ii = 0; ii < 8; ii++)
-            {
-                *addr = *source++;
-                addr += 256;
-            }
-
-            *zx_cxy2aaddr(i, j) = *colors++;
-        }
-    }
-}
-
-void zxgui_line(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t c) __z88dk_callee
-{
-    uint8_t* data = get_gui_tiles() + c * 8;
-    uint8_t* addr = zx_cxy2saddr(x, y);
-
-    for (uint8_t i = 0; i < 8; i++)
-    {
-        memset(addr, *data++, w);
-        addr += 256;
-    }
-
-    memset(zx_cxy2aaddr(x, y), form_color, w);
 }
 
 void zxgui_rectangle(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t c) __z88dk_callee
@@ -141,4 +108,7 @@ void object_invalidate(void* object, uint8_t flag)
 {
     struct gui_object_t* c = object;
     c->flags |= flag;
+#ifdef HAS_SYSTEM_OBJECT_INVALIDATED_CB
+    system_object_invalidated();
+#endif
 }

@@ -8,6 +8,12 @@
 extern "C" {
 #endif
 
+#ifdef __SPECTRUM
+#define STACKLESS_PROCESS (1)
+#else
+#define COMBINE_OBJECTS_UPON_SENDING (1)
+#endif
+
 enum proto_process_state_t
 {
     proto_process_recv_header = 0,
@@ -22,7 +28,7 @@ struct proto_process_t
     uint16_t recv_size;
     uint16_t request_id;
     uint16_t recv_object_size;
-    uint8_t process_buffer[2048];
+    uint8_t process_buffer[1400];
     uint16_t total_received;
     uint16_t total_consumed;
     uint8_t recv_objects_num;

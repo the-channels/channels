@@ -3,8 +3,7 @@
 #include "netlog.h"
 #include "proto_objects.h"
 #include "channels_proto.h"
-#include <spectranet.h>
-#include "memory_layout.h"
+#include "system.h"
 
 static uint16_t current_request_id = 0;
 static int sockfd = -1;
@@ -16,16 +15,13 @@ static channels_error_callback_f error_callback;
 static char selected_channel[32] = {};
 static char selected_board[32] = {};
 static char selected_thread[32] = {};
-static char error_str[128];
+static char error_str[64];
 
 uint8_t channels_proxy_connect(const char* address, channels_disconnected_callback_f disconnected)
 {
     netlog_2("Connecting: ", address);
 
-    setpageb(SPECTRANET_PROTO_PAGE);
-    struct proto_process_t* proto = (struct proto_process_t*)0x2000;
-    memset(proto, 0, sizeof(struct proto_process_t));
-
+    allocate_proto_process_struct();
     sockfd = channels_proto_connect(address, 9493, disconnected);
 
     if (sockfd < 0)
@@ -40,6 +36,7 @@ uint8_t channels_proxy_connect(const char* address, channels_disconnected_callba
 
 void channels_proxy_disconnect()
 {
+    sockfd = -1;
     channels_proto_disconnect();
 }
 
@@ -88,14 +85,12 @@ static const char* channels_proxy_recv(int socket, struct proto_process_t* proto
 
 void channels_proxy_update()
 {
-    if (sockfd == -1)
+    if (sockfd < 0)
     {
         return;
     }
 
-    setpageb(SPECTRANET_PROTO_PAGE);
-    struct proto_process_t* proto = (struct proto_process_t*)0x2000;
-
+    struct proto_process_t* proto = get_proto_process_struct();
     channels_proto_client_process(proto,
         channels_new_request, channels_object_callback, channels_proxy_recv);
 }

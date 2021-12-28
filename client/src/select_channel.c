@@ -4,7 +4,7 @@
 #include "netlog.h"
 #include "heap.h"
 #include <stdlib.h>
-
+#include "alert.h"
 #include "channels_proto.h"
 #include "channels.h"
 
@@ -13,6 +13,7 @@ struct scene_objects_t
     struct gui_scene_t scene;
     struct gui_form_t selection;
     struct gui_select_t channel;
+    struct gui_button_t button_cancel;
     char selected_channel[64];
     uint8_t channel_data[1024];
 };
@@ -52,7 +53,7 @@ static void get_channels_response(struct proto_process_t* proto)
 
 static void get_channels_error(const char* error)
 {
-    switch_alert(error, switch_connect_to_proxy);
+    alert_and_switch_to_connect(error);
 }
 
 static uint8_t* obtain_channel_data(struct gui_select_t* this)
@@ -67,17 +68,34 @@ void switch_select_channel()
 
     zxgui_scene_init(&scene_objects->scene, NULL);
 
-    zxgui_form_init(&scene_objects->selection, XYWH(8, 7, 15, 11), "Select Channel", FORM_STYLE_DEFAULT);
+    zxgui_form_init(&scene_objects->selection,
+#ifdef STATIC_SCREEN_SIZE
+        XYWH(8, 7, 15, 11),
+#else
+        XYWH(SCREEN_WIDTH > 64 ? ((SCREEN_WIDTH / 2) - 24) : 8 , (SCREEN_HEIGHT / 2) - 6, SCREEN_WIDTH > 64 ? 48 : SCREEN_WIDTH - 16, 12),
+#endif
+        "Select Channel", FORM_STYLE_DEFAULT);
 
     {
-        zxgui_select_init(&scene_objects->channel, XYWH(0, 0, 13, 6), obtain_channel_data, NULL, channel_selected);
+        zxgui_select_init(&scene_objects->channel,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 0, 13, 6),
+#else
+            XYWH(0, 0, SCREEN_WIDTH > 64 ? 46 : SCREEN_WIDTH - 18, 7),
+#endif
+            obtain_channel_data, NULL, channel_selected);
         zxgui_form_add_child(&scene_objects->selection, &scene_objects->channel);
     }
 
     {
-        static struct gui_button_t button_cancel;
-        zxgui_button_init(&button_cancel, XYWH(0, 8, 8, 1), 13, GUI_ICON_RETURN, "SELECT", proceed_with_selection);
-        zxgui_form_add_child(&scene_objects->selection, &button_cancel);
+        zxgui_button_init(&scene_objects->button_cancel,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 8, 8, 1),
+#else
+            XYWH(0, 9, 8, 1),
+#endif
+            13, GUI_ICON_RETURN, "SELECT", proceed_with_selection);
+        zxgui_form_add_child(&scene_objects->selection, &scene_objects->button_cancel);
     }
 
 
@@ -94,5 +112,5 @@ void switch_select_channel()
         return;
     }
 
-    switch_progress("Fetching channels", NULL);
+    switch_progress("Fetching channels");
 }

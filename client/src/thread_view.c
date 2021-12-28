@@ -4,7 +4,7 @@
 #include "scenes.h"
 #include "system.h"
 #include "netlog.h"
-
+#include "alert.h"
 #include "channels_proto.h"
 #include "proto_asserts.h"
 #include "channels.h"
@@ -13,8 +13,8 @@
 /* 28 pages of 4k each are available to us, each page fits 2 posts (1k post 1k post image) */
 #define ENTRIES_PER_REQUEST (16)
 #define MAX_ENTRIES_PER_SCREEN (8)
-#define SELECTED_THREAD_COLOR (INK_BLACK | PAPER_YELLOW )
-#define DESELECTED_THREAD_COLOR (INK_YELLOW | PAPER_BLACK)
+#define SELECTED_THREAD_COLOR (COLOR_FG_BLACK | COLOR_BG_YELLOW )
+#define DESELECTED_THREAD_COLOR (COLOR_FG_YELLOW | COLOR_BG_BLACK)
 
 struct channel_ui_entry_t
 {
@@ -37,6 +37,7 @@ struct scene_objects_t
     struct gui_object_t* last_static_object;
 
     struct channel_ui_entry_t ui_entries[MAX_ENTRIES_PER_SCREEN];
+    struct channels_alert_buf_t alert;
 };
 
 struct help_scene_objects_t
@@ -139,12 +140,18 @@ static struct channel_entry_t* attachment_being_requested;
 
 static void enable_loading_icon()
 {
+    if (scene_objects == NULL)
+        return;
+
     scene_objects->loading_icon.flags &= ~GUI_FLAG_HIDDEN;
     object_invalidate(&scene_objects->loading_icon, GUI_FLAG_DIRTY);
 }
 
 static void disable_loading_icon()
 {
+    if (scene_objects == NULL)
+        return;
+
     object_invalidate(&scene_objects->loading_icon, GUI_FLAG_DIRTY | GUI_FLAG_HIDDEN);
 }
 
@@ -206,21 +213,13 @@ static void highlight_thread(struct channel_entry_t* th)
     if (selected_entry && (selected_entry != th))
     {
         zxgui_screen_color(DESELECTED_THREAD_COLOR);
-        zxgui_screen_recolor(0, selected_entry->screen_y, 32, 1);
+        zxgui_screen_recolor(0, selected_entry->screen_y, SCREEN_WIDTH, 1);
     }
 
     selected_entry = th;
 
     zxgui_screen_color(SELECTED_THREAD_COLOR);
-    zxgui_screen_recolor(0, selected_entry->screen_y, 32, 1);
-}
-
-static void get_entries_error(const char* error)
-{
-    free_view();
-
-    netlog_1(error);
-    switch_alert(error, switch_connect_to_proxy);
+    zxgui_screen_recolor(0, selected_entry->screen_y, SCREEN_WIDTH, 1);
 }
 
 static void switch_back_to_boards()
@@ -264,7 +263,7 @@ static void switch_back_to_threads()
 
         if (request() == 0)
         {
-            switch_progress(replies_stack_pointer ? "Opening Replies" : "Opening Original Thread", NULL);
+            switch_progress(replies_stack_pointer ? "Opening Replies" : "Opening Original Thread");
         }
         return;
     }
@@ -293,7 +292,7 @@ static void exit_fullscreen_image(struct gui_button_t* this)
 
 static void get_fullscreen_image_response(struct proto_process_t* proto)
 {
-    zxgui_screen_color(INK_WHITE | BRIGHT | PAPER_BLACK);
+    zxgui_screen_color(COLOR_FG_WHITE | COLOR_BRIGHT | COLOR_BG_BLACK);
     zxgui_screen_clear(0, 23, 32, 1);
 
     object_invalidate(&scene_objects->button_exit_full_image, GUI_FLAG_DIRTY);
@@ -320,7 +319,7 @@ static void process_fullscreen_image(ChannelObject* object)
 static void get_fullscreen_image_error(const char* error)
 {
     netlog_1(error);
-    switch_alert(error, redraw_screen);
+    switch_alert(&scene_objects->alert, error, redraw_screen);
 }
 
 static void open_full_picture(struct gui_button_t* this)
@@ -347,7 +346,7 @@ static void open_full_picture(struct gui_button_t* this)
 
     if (grayscale)
     {
-        zxgui_screen_color(INK_WHITE | PAPER_BLACK);
+        zxgui_screen_color(COLOR_FG_WHITE | COLOR_BG_BLACK);
         zxgui_screen_recolor(0, 0, 32, 24);
 
         scene_objects->button_grayscale_full_image.title = "COLOR";
@@ -379,7 +378,7 @@ static void open_full_picture(struct gui_button_t* this)
 
     if (channels_send_request(request, process_fullscreen_image, get_fullscreen_image_response, get_fullscreen_image_error))
     {
-        switch_alert("Disconnected from Proxy", switch_connect_to_proxy);
+        alert_and_switch_to_connect("Disconnected from Proxy");
         return;
     }
 }
@@ -415,7 +414,7 @@ static void redraw_screen()
         if (replies_stack_pointer)
         {
             strcpy(title, "replies level ");
-            itoa(replies_stack_pointer, title + 14, 10);
+            int_to_string(replies_stack_pointer, title + 14);
         }
         else
         {
@@ -427,10 +426,10 @@ static void redraw_screen()
             strcat(title, channels_get_thread());
             strcat(title, ", ");
             uint8_t into = strlen(title);
-            itoa(first_display_entry->offset + 1, title + into, 10);
+            int_to_string(first_display_entry->offset + 1, title + into);
             strcat(title, " out of ");
             into = strlen(title);
-            itoa(num_entries_total, title + into, 10);
+            int_to_string(num_entries_total, title + into);
         }
     }
     else
@@ -441,10 +440,10 @@ static void redraw_screen()
         strcat(title, channels_get_board());
         strcat(title, ", ");
         uint8_t into = strlen(title);
-        itoa(first_display_entry->offset + 1, title + into, 10);
+        int_to_string(first_display_entry->offset + 1, title + into);
         strcat(title, " out of ");
         into = strlen(title);
-        itoa(num_entries_total, title + into, 10);
+        int_to_string(num_entries_total, title + into);
     }
 
     scene_objects->last_static_object->next = NULL;
@@ -479,13 +478,13 @@ static void redraw_screen()
             text_ui_puts_at(1, h, th->title);
         }
 
-        zxgui_screen_recolor(0, h, 32, 1);
-        zxgui_screen_put(28, h, GUI_ICON_REPLIES);
+        zxgui_screen_recolor(0, h, SCREEN_WIDTH, 1);
+        zxgui_screen_put(SCREEN_WIDTH - 4, h, GUI_ICON_REPLIES);
 
         text_ui_color(cc);
         char header[8];
-        itoa(th->replies, header, 10);
-        text_ui_puts_at(29, h, header);
+        int_to_string(th->replies, header);
+        text_ui_puts_at(SCREEN_WIDTH - 3, h, header);
 
         h++;
 
@@ -493,12 +492,12 @@ static void redraw_screen()
         if (th->flags & ENTRY_FLAG_HAS_ATTACHMENT)
         {
             x_ = 10;
-            w_ = 22;
+            w_ = SCREEN_WIDTH - 10;
         }
         else
         {
             x_ = 0;
-            w_ = 32;
+            w_ = SCREEN_WIDTH;
         }
 
         if (th->flags & ENTRY_FLAG_HAS_ATTACHMENT)
@@ -523,13 +522,13 @@ static void redraw_screen()
                     GUI_ICON_LOADING_A_4
                 };
 
-                zxgui_icon(INK_WHITE | PAPER_BLACK, 4,
+                zxgui_icon(COLOR_FG_WHITE | COLOR_BG_BLACK, 4,
                     th->screen_y +
                     th->attachment_h / 2, 2, 2, frames);
             }
         }
 
-        zxgui_dynamic_label_init(&ui_entry->comment_label, get_xywh(x_, h, w_, th->height), INK_WHITE | PAPER_BLACK,
+        zxgui_dynamic_label_init(&ui_entry->comment_label, get_xywh(x_, h, w_, th->height), COLOR_FG_WHITE | COLOR_BG_BLACK,
             GUI_FLAG_MULTILINE, comment_obtain_data, th);
 
         th = th->next;
@@ -565,7 +564,7 @@ static void attachment_errored(struct channel_entry_t* entry)
         QUESTION_MARK_4
     };
 
-    zxgui_icon(INK_RED | PAPER_BLACK,
+    zxgui_icon(COLOR_FG_RED | COLOR_BG_BLACK,
         4, entry->screen_y + entry->attachment_h / 2, 2, 2, frames);
 }
 
@@ -657,17 +656,6 @@ static void fetch_next_thread_attachment()
     uint16_t target_w = (uint16_t)attachment_being_requested->attachment_w * 8;
     uint16_t target_h = (uint16_t)attachment_being_requested->attachment_h * 8;
 
-    const char* thid;
-
-    if (post_mode)
-    {
-        thid = channels_get_thread();
-    }
-    else
-    {
-        thid = attachment_being_requested->id;
-    }
-
     declare_str_property_on_stack(key, OBJ_PROPERTY_ID, "image", NULL);
     declare_str_property_on_stack(channel, 'c', channels_get_channel(), &key);
     declare_arg_property_on_stack(url_, 'i', attachment_being_requested->attachment_id, &channel);
@@ -716,7 +704,7 @@ static void key_pressed(int key)
 
                 if (request() == 0)
                 {
-                    switch_progress("Opening Replies", NULL);
+                    switch_progress("Opening Replies");
                 }
             }
             else
@@ -728,7 +716,7 @@ static void key_pressed(int key)
 
                 if (request() == 0)
                 {
-                    switch_progress("Opening Thread", NULL);
+                    switch_progress("Opening Thread");
                 }
             }
 
@@ -904,7 +892,8 @@ static void process_posting_entry(ChannelObject* object)
 
 static void get_posting_entries_error(const char* error)
 {
-    switch_alert(error, refresh_thread_view);
+    alloc_view_objects();
+    switch_alert(&scene_objects->alert, error, refresh_thread_view);
 }
 
 static void get_posting_response(struct proto_process_t* proto)
@@ -927,10 +916,10 @@ static void post_comment(struct gui_button_t* this)
 
     if (channels_send_request(req, process_posting_entry, get_posting_response, get_posting_entries_error))
     {
-        switch_alert("Cannot send a post", refresh_thread_view);
+        switch_alert(&scene_objects->alert, "Cannot send a post", refresh_thread_view);
     }
 
-    switch_progress("Posting...", NULL);
+    switch_progress("Posting...");
 }
 
 static void switch_posting_mode(const char* reply_to)
@@ -961,26 +950,64 @@ static void switch_posting_mode(const char* reply_to)
     zxgui_scene_init(&posting_scene_objects->scene, NULL);
 
     {
-        zxgui_label_init(&posting_scene_objects->title, XYWH(0, 0, 32, 1), posting_scene_objects->reply_to_title,
-             INK_BLACK | PAPER_WHITE, 0);
+        zxgui_label_init(&posting_scene_objects->title,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 0, 32, 1),
+#else
+            XYWH(0, 0, SCREEN_WIDTH - 1, 1),
+#endif
+            posting_scene_objects->reply_to_title, COLOR_FG_BLACK | COLOR_BG_WHITE, 0);
+
         zxgui_scene_add(&posting_scene_objects->scene, &posting_scene_objects->title);
     }
 
     {
-        zxgui_button_init(&posting_scene_objects->button_exit, XYWH(0, 23, 0, 1), 32, GUI_ICON_SPACE, "BACK", exit_posting);
+        zxgui_button_init(&posting_scene_objects->button_exit,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 23, 0, 1),
+#else
+            XYWH(0, SCREEN_HEIGHT - 1, 0, 1),
+#endif
+#ifdef __SPECTRUM
+            32, GUI_ICON_SPACE, "BACK", exit_posting);
+#else
+            27, GUI_ICON_ESCAPE, "BACK", exit_posting);
+#endif
+
         zxgui_scene_add(&posting_scene_objects->scene, &posting_scene_objects->button_exit);
+
+#ifdef __SPECTRUM
         posting_scene_objects->button_exit.flags |= GUI_FLAG_SYM;
+#endif
     }
 
     {
-        zxgui_button_init(&posting_scene_objects->button_post, XYWH(5, 23, 0, 1), 13, GUI_ICON_RETURN, "POST", post_comment);
+        zxgui_button_init(&posting_scene_objects->button_post,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(5, 23, 0, 1),
+#else
+            XYWH(TWO_CHARACTERS_FIT_IN * 5, SCREEN_HEIGHT - 1, 0, 1),
+#endif
+            13, GUI_ICON_RETURN, "POST", post_comment);
+
         zxgui_scene_add(&posting_scene_objects->scene, &posting_scene_objects->button_post);
+
+#ifdef __SPECTRUM
         posting_scene_objects->button_post.flags |= GUI_FLAG_SYM;
+#endif
     }
 
     {
         strcpy(posting_scene_objects->post_content, "");
-        zxgui_multiline_edit_init(&posting_scene_objects->post_body, XYWH(0, 1, 31, 21), posting_scene_objects->post_content, 1024);
+
+        zxgui_multiline_edit_init(&posting_scene_objects->post_body,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 1, 31, 21),
+#else
+            XYWH(0, 1, SCREEN_WIDTH - 1, SCREEN_HEIGHT - 3),
+#endif
+            posting_scene_objects->post_content, 1024);
+
         zxgui_scene_add(&posting_scene_objects->scene, &posting_scene_objects->post_body);
     }
 
@@ -1001,7 +1028,13 @@ static void switch_help(struct gui_button_t* this)
     zxgui_scene_init(&help_scene_objects->help_scene, NULL);
 
     {
-        zxgui_button_init(&help_scene_objects->button_exit_help, XYWH(0, 23, 0, 1), 32, GUI_ICON_SPACE, "BACK", exit_help);
+        zxgui_button_init(&help_scene_objects->button_exit_help,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 23, 0, 1),
+#else
+            XYWH(0, SCREEN_HEIGHT - 1, 0, 1),
+#endif
+            32, GUI_ICON_SPACE, "BACK", exit_help);
         zxgui_scene_add(&help_scene_objects->help_scene, &help_scene_objects->button_exit_help);
     }
 
@@ -1105,11 +1138,11 @@ static void process_entry(ChannelObject* object)
             }
 
             th->height = th->attachment_h;
-            label_w = 21;
+            label_w = SCREEN_WIDTH - 11;
         }
         else
         {
-            label_w = 31;
+            label_w = SCREEN_WIDTH - 1;
         }
 
         th->comment_blob_id = allocate_heap_blob();
@@ -1118,7 +1151,7 @@ static void process_entry(ChannelObject* object)
         memcpy(comment_blob_data, comment->value, comment->value_size);
         comment_blob_data[comment->value_size] = 0;
 
-        uint8_t max_height = post_mode ? 22 : 10;
+        uint8_t max_height = post_mode ? SCREEN_HEIGHT - 10 : 10;
 
         uint8_t min_height = zxgui_label_text_height(label_w, (char*)comment_blob_data,
             comment->value_size, max_height);
@@ -1151,7 +1184,7 @@ static void process_entry(ChannelObject* object)
             }
         }
 
-        if ((process_entries_on_screen >= MAX_ENTRIES_PER_SCREEN) || (process_screen_h + th->height + 1 >= 23))
+        if ((process_entries_on_screen >= MAX_ENTRIES_PER_SCREEN) || (process_screen_h + th->height + 1 >= SCREEN_HEIGHT - 1))
         {
             process_screen_num++;
             process_screen_h = 0;
@@ -1206,17 +1239,38 @@ static void alloc_view_objects()
     scene_objects->scene.key_pressed = key_pressed;
 
     {
-        zxgui_button_init(&scene_objects->button_cancel, XYWH(0, 23, 0, 1), 32, GUI_ICON_SPACE, "BACK", switch_back);
+        zxgui_button_init(&scene_objects->button_cancel,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 23, 0, 1),
+#else
+            XYWH(0, SCREEN_HEIGHT - 1, 0, 1),
+#endif
+            32, GUI_ICON_SPACE, "BACK", switch_back);
         zxgui_scene_add(&scene_objects->scene, &scene_objects->button_cancel);
     }
 
     {
-        zxgui_button_init(&scene_objects->button_help, XYWH(4, 23, 0, 1), 'h', GUI_ICON_QUESTION, "HELP", switch_help);
+        zxgui_button_init(&scene_objects->button_help,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 23, 0, 1),
+#else
+            XYWH(4 * TWO_CHARACTERS_FIT_IN, SCREEN_HEIGHT - 1, 0, 1),
+#endif
+            'h', GUI_ICON_H, "HELP", switch_help);
+
         zxgui_scene_add(&scene_objects->scene, &scene_objects->button_help);
     }
 
     {
-        zxgui_label_init(&scene_objects->post_label, XYWH(8, 23, 23, 1), title, INK_GREEN | PAPER_BLACK, 0);
+        zxgui_label_init(&scene_objects->post_label,
+
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(8, 23, 23, 1),
+#else
+            XYWH(8 * TWO_CHARACTERS_FIT_IN, SCREEN_HEIGHT - 1, SCREEN_WIDTH - 8 * TWO_CHARACTERS_FIT_IN - 4, 1),
+#endif
+            title, COLOR_FG_GREEN | COLOR_BG_BLACK, 0);
+
         zxgui_scene_add(&scene_objects->scene, &scene_objects->post_label);
     }
 
@@ -1225,7 +1279,14 @@ static void alloc_view_objects()
                 GUI_ICON_LOADING_SMALL_1,
                 GUI_ICON_LOADING_SMALL_2
         };
-        zxgui_animated_icon_init(&scene_objects->loading_icon, XYWH(31, 23, 1, 1), 2, BRIGHT | INK_GREEN | PAPER_BLACK, frames, 32);
+
+        zxgui_animated_icon_init(&scene_objects->loading_icon,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(31, 23, 1, 1),
+#else
+            XYWH(SCREEN_WIDTH - 1, SCREEN_HEIGHT - 1, 1, 1),
+#endif
+            2, COLOR_BRIGHT | COLOR_FG_GREEN | COLOR_BG_BLACK, frames, ANIMATION_SPEED);
         zxgui_scene_add(&scene_objects->scene, &scene_objects->loading_icon);
     }
 
@@ -1244,9 +1305,11 @@ static void alloc_view_objects()
 
 static void get_entries_response(struct proto_process_t* proto)
 {
+    netlog_1("get_entries_response");
+
     if (first_entry == NULL)
     {
-        switch_alert("Server returned empty response", switch_connect_to_proxy);
+        alert_and_switch_to_connect("Server returned empty response");
         return;
     }
 
@@ -1327,13 +1390,13 @@ static uint8_t request()
 
     enable_loading_icon();
 
-    if (channels_send_request(request, process_entry, get_entries_response, get_entries_error))
+    if (channels_send_request(request, process_entry, get_entries_response, alert_and_switch_to_connect))
     {
-        switch_alert("Cannot fetch threads", switch_connect_to_proxy);
+        alert_and_switch_to_connect("Cannot fetch threads");
         return 1;
     }
 
-    switch_progress(post_mode ? "Fetching Posts" : "Fetching Threads", NULL);
+    switch_progress(post_mode ? "Fetching Posts" : "Fetching Threads");
 
     return 0;
 }

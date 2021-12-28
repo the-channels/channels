@@ -59,17 +59,27 @@ enum gui_tiles {
     GUI_SELECTED_ENTRY,
     GUI_ICON_REPLIES,
     GUI_ICON_REPLY,
-    GUI_ICON_QUESTION,
+    GUI_ICON_H,
     GUI_ICON_R,
     GUI_ICON_N,
     GUI_ICON_SYM,
     GUI_ICON_5,
     GUI_ICON_T,
     GUI_ICON_B,
+    GUI_ICON_EMPTY,
+    GUI_ICON_ESCAPE,
 };
 
 enum gui_event_type {
     GUI_EVENT_KEY_PRESSED,
+};
+
+enum gui_event_keycodes {
+    GUI_KEY_CODE_DOWN = 10,
+    GUI_KEY_CODE_UP = 11,
+    GUI_KEY_CODE_BACKSPACE = 12,
+    GUI_KEY_CODE_RETURN = 13,
+    GUI_KEY_CODE_ESCAPE = 27,
 };
 
 struct gui_event_key_pressed
@@ -134,10 +144,14 @@ struct gui_form_t
 struct gui_edit_t
 {
     GUI_OBJECT_BASE;
+#ifdef __SPECTRUM
     uint8_t* cursor_pixels_addr;
     uint8_t* cursor_color_addr;
     uint8_t cursor_even;
-    uint8_t last_text_height;
+#else
+    uint8_t cursor_x;
+    uint8_t cursor_y;
+#endif
     uint16_t value_size;
     char* value;
 };
@@ -166,14 +180,20 @@ struct gui_select_t
     struct gui_select_option_t* last_selection;
 };
 
+#ifdef __SPECTRUM
+typedef uint8_t animation_speed_t;
+#else
+typedef uint32_t animation_speed_t;
+#endif
+
 struct gui_animated_icon_t
 {
     GUI_OBJECT_BASE;
     uint8_t color;
     uint8_t frames;
     uint8_t current_frame;
-    uint8_t time;
-    uint8_t speed;
+    animation_speed_t time;
+    animation_speed_t speed;
     const uint8_t* source;
 };
 
@@ -230,59 +250,59 @@ struct gui_scene_t
     gui_scene_key_pressed_f key_pressed;
 };
 
-void zxgui_init(void);
+extern void zxgui_init(void);
 
-void zxgui_scene_init(struct gui_scene_t* scene, gui_scene_update_f update);
-void zxgui_scene_set(struct gui_scene_t* scene);
-void zxgui_scene_add(struct gui_scene_t* scene, void* object) __z88dk_callee;
-void zxgui_scene_set_focus(struct gui_scene_t* scene, void* object) __z88dk_callee;
-uint8_t zxgui_scene_dispatch_event(struct gui_scene_t* scene,
+extern void zxgui_scene_init(struct gui_scene_t* scene, gui_scene_update_f update);
+extern void zxgui_scene_set(struct gui_scene_t* scene);
+extern void zxgui_scene_add(struct gui_scene_t* scene, void* object) __z88dk_callee;
+extern void zxgui_scene_set_focus(struct gui_scene_t* scene, void* object) __z88dk_callee;
+extern uint8_t zxgui_scene_dispatch_event(struct gui_scene_t* scene,
     enum gui_event_type event_type, void* event) __z88dk_callee;
-struct gui_object_t* zxgui_scene_get_last_object(struct gui_scene_t* scene);
-void object_invalidate(void* object, uint8_t flag);
-void zxgui_line(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t c) __z88dk_callee;
-void zxgui_scene_iteration(void);
-void zxgui_rectangle(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t c) __z88dk_callee;
-void zxgui_icon(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* source) __z88dk_callee;
-void zxgui_image(uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* source, const uint8_t* colors) __z88dk_callee;
+extern struct gui_object_t* zxgui_scene_get_last_object(struct gui_scene_t* scene);
+extern void object_invalidate(void* object, uint8_t flag);
+extern void zxgui_line(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t c) __z88dk_callee;
+extern void zxgui_scene_iteration(void);
+extern void zxgui_rectangle(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t c) __z88dk_callee;
+extern void zxgui_icon(uint8_t form_color, uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* source) __z88dk_callee;
+extern void zxgui_image(uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* source, const uint8_t* colors) __z88dk_callee;
 extern struct gui_object_t* zxgui_get_last_object(struct gui_object_t* object);
-uint8_t is_object_invalidated(void* object);
+extern uint8_t is_object_invalidated(void* object);
 
 typedef uint32_t xywh_t;
-#define XYWH(x, y, w, h) (uint32_t)((uint8_t)x + ((uint8_t)y * 0x100) + ((uint8_t)w * 0x10000) + ((uint8_t)h * 0x1000000))
-xywh_t get_xywh(uint8_t x, uint8_t y, uint8_t w, uint8_t h) __z88dk_callee;
+#define XYWH(x, y, w, h) (uint32_t)((uint8_t)(x) + ((uint8_t)(y) * 0x100) + ((uint8_t)(w) * 0x10000) + ((uint8_t)(h) * 0x1000000))
+extern xywh_t get_xywh(uint8_t x, uint8_t y, uint8_t w, uint8_t h) __z88dk_callee;
 
-void zxgui_base_init(void* o, xywh_t xywh, void* render, void* event) ZXGUI_CDECL;
+extern void zxgui_base_init(void* o, xywh_t xywh, void* render, void* event) ZXGUI_CDECL;
 
-void zxgui_form_init(struct gui_form_t* form, xywh_t xywh, const char* title, uint8_t style) ZXGUI_CDECL;
-void zxgui_form_add_child(struct gui_form_t* form, void* child) ZXGUI_CDECL;
-void zxgui_edit_init(struct gui_edit_t* edit, xywh_t xywh, char* buffer, uint16_t buffer_size) ZXGUI_CDECL;
-void zxgui_multiline_edit_init(struct gui_edit_t* edit, xywh_t xywh, char* buffer, uint16_t buffer_size) ZXGUI_CDECL;
-void zxgui_select_init(struct gui_select_t* select, xywh_t xywh,
+extern void zxgui_form_init(struct gui_form_t* form, xywh_t xywh, const char* title, uint8_t style) ZXGUI_CDECL;
+extern void zxgui_form_add_child(struct gui_form_t* form, void* child) ZXGUI_CDECL;
+extern void zxgui_edit_init(struct gui_edit_t* edit, xywh_t xywh, char* buffer, uint16_t buffer_size) ZXGUI_CDECL;
+extern void zxgui_multiline_edit_init(struct gui_edit_t* edit, xywh_t xywh, char* buffer, uint16_t buffer_size) ZXGUI_CDECL;
+extern void zxgui_select_init(struct gui_select_t* select, xywh_t xywh,
     gui_select_obtain_data_f obtain_data, void* user,
     gui_select_selected selected) ZXGUI_CDECL;
-uint8_t* zxgui_select_add_option(struct gui_select_t* select, const char* option,
+extern uint8_t* zxgui_select_add_option(struct gui_select_t* select, const char* option,
     uint8_t option_len, uint16_t user_data_amount) ZXGUI_CDECL;
-void zxgui_button_init(struct gui_button_t* button, xywh_t xywh,
+extern void zxgui_button_init(struct gui_button_t* button, xywh_t xywh,
     uint8_t key, uint8_t icon, const char* title, gui_button_pressed_f pressed) ZXGUI_CDECL;
-void zxgui_label_init(struct gui_label_t* label, xywh_t xywh,
+extern void zxgui_label_init(struct gui_label_t* label, xywh_t xywh,
     const char* title, uint8_t color, uint8_t flags) ZXGUI_CDECL;
-void zxgui_dynamic_label_init(struct gui_dynamic_label_t* label, xywh_t xywh,
+extern void zxgui_dynamic_label_init(struct gui_dynamic_label_t* label, xywh_t xywh,
     uint8_t color, uint8_t flags, gui_label_obtain_title_data_f obtain_data, void* user) ZXGUI_CDECL;
-uint8_t zxgui_label_text_height(uint8_t w, const char* text, uint16_t len, uint8_t max_height) ZXGUI_CDECL;
-void zxgui_animated_icon_init(struct gui_animated_icon_t* icon, xywh_t xywh,
-    uint8_t frames, uint8_t color, const uint8_t* source, uint8_t speed) ZXGUI_CDECL;
-void zxgui_image_init(struct gui_image_t* image, xywh_t xywh,
+extern uint8_t zxgui_label_text_height(uint8_t w, const char* text, uint16_t len, uint8_t max_height) ZXGUI_CDECL;
+extern void zxgui_animated_icon_init(struct gui_animated_icon_t* icon, xywh_t xywh,
+    uint8_t frames, uint8_t color, const uint8_t* source, animation_speed_t speed) ZXGUI_CDECL;
+extern void zxgui_image_init(struct gui_image_t* image, xywh_t xywh,
     const uint8_t* source, const uint8_t* colors) ZXGUI_CDECL;
-void zxgui_dynamic_image_init(struct gui_dynamic_image_t* image, xywh_t xywh,
+extern void zxgui_dynamic_image_init(struct gui_dynamic_image_t* image, xywh_t xywh,
     gui_label_obtain_image_f obtain_data, void* user) ZXGUI_CDECL;
 
 extern uint8_t screen_color;
 
 #define zxgui_screen_color(color) screen_color = color;
-void zxgui_screen_put(uint8_t x, uint8_t y, uint8_t ch) __z88dk_callee;
-void zxgui_screen_clear(uint8_t x, uint8_t y, uint8_t w, uint8_t h) __z88dk_callee;
-void zxgui_screen_recolor(uint8_t x, uint8_t y, uint8_t w, uint8_t h) __z88dk_callee;
+extern void zxgui_screen_put(uint8_t x, uint8_t y, uint8_t ch) __z88dk_callee;
+extern void zxgui_screen_clear(uint8_t x, uint8_t y, uint8_t w, uint8_t h) __z88dk_callee;
+extern void zxgui_screen_recolor(uint8_t x, uint8_t y, uint8_t w, uint8_t h) __z88dk_callee;
 
 #pragma clang diagnostic pop
 

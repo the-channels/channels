@@ -2,7 +2,7 @@
 #include <stdint.h>
 
 #include "zxgui.h"
-#include <spectrum.h>
+#include "system.h"
 #include <text_ui.h>
 #include <string.h>
 
@@ -30,7 +30,7 @@ static void _form_render(uint8_t x, uint8_t y, struct gui_form_t* this, struct g
             case FORM_STYLE_FRAME:
             {
                 c = GUI_SELECT_LEFT_BOTTOM_CORNER;
-                f = INK_BLACK | BRIGHT | PAPER_CYAN;
+                f = COLOR_FG_BLACK | COLOR_BRIGHT | COLOR_BG_CYAN;
 
                 break;
             }
@@ -38,20 +38,20 @@ static void _form_render(uint8_t x, uint8_t y, struct gui_form_t* this, struct g
             default:
             {
                 c = GUI_FORM_LEFT_BOTTOM_CORNER;
-                f = INK_WHITE | PAPER_BLACK;
+                f = COLOR_FG_WHITE | COLOR_BG_BLACK;
                 break;
             }
         }
 
         if (this->style != FORM_STYLE_EMPTY)
         {
-            zxgui_rectangle(INK_CYAN | BRIGHT | PAPER_BLACK, x, y, this->w, this->h, c);
+            zxgui_rectangle(COLOR_FG_CYAN | COLOR_BRIGHT | COLOR_BG_BLACK, x, y, this->w, this->h, c);
         }
 
         zxgui_screen_color(f);
         zxgui_screen_clear(x + 1, y + 1, this->w - 1, 1);
 
-        uint8_t ll = strlen(((char *) this->title)) / 2;
+        uint8_t ll = strlen(((char *) this->title)) / CHARACTERS_PER_CELL;
         int16_t title_offset = (this->w - ll) / 2;
         text_ui_color(f);
         text_ui_puts_at(x + title_offset, y + 1, this->title);

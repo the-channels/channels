@@ -2,36 +2,45 @@
 #include "scenes.h"
 #include "system.h"
 #include <string.h>
+#include "alert.h"
 
-static struct gui_scene_t scene;
-static struct gui_form_t alert;
-static void (*back_callback)();
-
-static char alert_message[128] = {};
+static struct channels_alert_buf_t* alert = NULL;
 
 void return_to_callback(struct gui_button_t* this)
 {
-    back_callback();
+    if (alert->back_callback)
+        alert->back_callback();
 }
 
-void init_alert()
+static void init_alert(struct channels_alert_buf_t* a)
 {
-    zxgui_scene_init(&scene, NULL);
+    memset(a, 0, sizeof(struct channels_alert_buf_t));
 
-    zxgui_form_init(&alert, XYWH(0, 10, 31, 4), alert_message, FORM_STYLE_DEFAULT);
+    alert = a;
+
+    zxgui_scene_init(&alert->scene, NULL);
+
+    zxgui_form_init(&alert->alert,
+#ifdef STATIC_SCREEN_SIZE
+        XYWH(0, 10, 31, 4),
+#else
+        XYWH(SCREEN_WIDTH > 64 ? ((SCREEN_WIDTH / 2) - 24) : 8 , (SCREEN_HEIGHT / 2) - 2, SCREEN_WIDTH > 64 ? 48 : SCREEN_WIDTH - 16, 4),
+#endif
+        alert->alert_message, FORM_STYLE_DEFAULT);
 
     {
-        static struct gui_button_t button_cancel;
-        zxgui_button_init(&button_cancel, XYWH(0, 1, 8, 1), 13, GUI_ICON_RETURN, "OK", return_to_callback);
-        zxgui_form_add_child(&alert, &button_cancel);
+        zxgui_button_init(&alert->button_cancel, XYWH(0, 1, 8, 1), 13, GUI_ICON_RETURN, "OK", return_to_callback);
+        zxgui_form_add_child(&alert->alert, &alert->button_cancel);
     }
 
-    zxgui_scene_add(&scene, &alert);
+    zxgui_scene_add(&alert->scene, &alert->alert);
 }
 
-void switch_alert(const char* message, void (*callback)())
+void switch_alert(struct channels_alert_buf_t* a, const char* message, void (*callback)())
 {
-    strcpy(alert_message, message);
-    back_callback = callback;
-    zxgui_scene_set(&scene);
+    init_alert(a);
+
+    strcpy(alert->alert_message, message);
+    alert->back_callback = callback;
+    zxgui_scene_set(&alert->scene);
 }

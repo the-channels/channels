@@ -1,12 +1,12 @@
 #include "zxgui.h"
 #include "scenes.h"
-#include <spectranet.h>
 #include <zxgui.h>
 #include "system.h"
 #include "channels.h"
 #include "proto_asserts.h"
 #include "netlog.h"
 #include "heap.h"
+#include "alert.h"
 
 long heap = 0;
 uint8_t fake_CRT_FONT_64 = 0;
@@ -14,46 +14,21 @@ uint8_t fake_CRT_FONT_64 = 0;
 void init_scenes()
 {
     init_progress();
-    init_alert();
-}
-
-static void get_mounted_path(char* into) __z88dk_fastcall __naked
-{
-#asm
-    ld (hl), $00            ;// reset a string to 0
-    push hl
-
-    ld de, $01ff            ;// AM_CONFIG_SECTION
-    ld hl, $FE02            ;// CFG_FINDSECTION
-    rst $28                 ;// MODULECALL_NOPAGE
-    jr c, no_config	        ;// we don't have a section, jump forward.
-
-    pop hl
-    ld de, hl               ;// load 'into' into de
-    ld a, $00	            ;// get 'AM_FS0' option
-    ld hl, $FE03            ;// CFG_GETCFSTRING
-    rst $28                 ;// MODULECALL_NOPAGE
-    jr c, no_option
-    ret
-no_config:
-    pop hl
-no_option:
-    ret
-#endasm
 }
 
 void switch_main()
 {
-    int detected = spectranet_detect();
-    zx_border(INK_BLACK);
+    int detected = test_network_capabilities();
+    set_border_color(COLOR_FG_BLACK);
     if (detected)
     {
-        switch_alert("Can not detect Spectranet cartridge.", switch_main);
+        struct channels_alert_buf_t* a = alloc_heap(sizeof(struct channels_alert_buf_t));
+        switch_alert(a, "Can not detect Spectranet cartridge.", NULL);
     }
     else
     {
         char mounted_path[64];
-        get_mounted_path(mounted_path);
+        get_default_connect_address(mounted_path);
 
         if (strlen(mounted_path))
         {
@@ -84,19 +59,17 @@ static void abort_loop()
 void proto_abort()
 {
     while(1) {
-        zx_border(INK_RED);
+        set_border_color(COLOR_FG_RED);
 #ifndef NDEBUG
         abort_loop();
 #endif
-        zx_border(INK_BLACK);
+        set_border_color(COLOR_FG_BLACK);
     }
 }
 
 int main()
 {
-    // never page out
-    pagein();
-
+    system_init();
     reset_heap();
 
     netlog_init(9468);
@@ -110,6 +83,9 @@ int main()
     {
         zxgui_scene_iteration();
         channels_proxy_update();
+#ifdef HAS_SYSTEM_UPDATE_CB
+        system_update();
+#endif
     }
 
     return 0;

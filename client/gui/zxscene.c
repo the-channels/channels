@@ -1,17 +1,7 @@
 #include "zxgui.h"
-#include <spectrum.h>
-#include <input.h>
+#include "system.h"
 
-enum input_state_t
-{
-    waiting,
-    key_pressed,
-    key_pressed_w_sym,
-};
-
-static struct gui_scene_t* current_scene = NULL;
-static enum input_state_t input_state = waiting;
-char last_key_pressed = 0;
+struct gui_scene_t* current_scene = NULL;
 
 struct gui_object_t* zxgui_scene_get_last_object(struct gui_scene_t* scene)
 {
@@ -62,8 +52,7 @@ static void scene_render()
 
 void zxgui_scene_set(struct gui_scene_t* scene)
 {
-    zx_colour(BRIGHT | INK_GREEN | PAPER_BLACK);
-    zx_cls();
+    clear_screen_with(COLOR_BRIGHT | COLOR_FG_GREEN | COLOR_BG_BLACK);
     current_scene = scene;
 
     struct gui_object_t* child = current_scene->child;
@@ -99,60 +88,7 @@ uint8_t zxgui_scene_dispatch_event(struct gui_scene_t* scene, enum gui_event_typ
     return 0;
 }
 
-static void process_last_key()
-{
-    struct gui_event_key_pressed e;
-    e.key = last_key_pressed;
-    if (zxgui_scene_dispatch_event(current_scene, GUI_EVENT_KEY_PRESSED, &e) == 0)
-    {
-        if (current_scene->key_pressed)
-        {
-            current_scene->key_pressed(last_key_pressed);
-        }
-    }
-}
-
-static void update_keyboard()
-{
-    switch (input_state)
-    {
-        case waiting:
-        {
-            last_key_pressed = (char)in_Inkey();
-            if (last_key_pressed)
-            {
-                process_last_key();
-
-                if (in_KeyPressed(0x4000) == 0 && in_KeyPressed(0x2000) == 0)
-                {
-                    input_state = key_pressed;
-                }
-                else
-                {
-                    input_state = key_pressed_w_sym;
-                }
-            }
-            break;
-        }
-        case key_pressed_w_sym:
-        {
-            if (0 == (char)in_Inkey())
-            {
-                input_state = waiting;
-            }
-            break;
-        }
-        case key_pressed:
-        {
-            char key = (char)in_Inkey();
-            if (key != last_key_pressed)
-            {
-                input_state = waiting;
-            }
-            break;
-        }
-    }
-}
+extern void update_keyboard();
 
 void zxgui_scene_iteration(void)
 {

@@ -1,9 +1,8 @@
 
 #include <string.h>
 #include "zxgui.h"
-#include <spectrum.h>
+#include "system.h"
 #include <text_ui.h>
-#include <input.h>
 
 static void _button_render(uint8_t x, uint8_t y, struct gui_button_t* this, struct gui_scene_t* scene)
 {
@@ -17,7 +16,7 @@ static void _button_render(uint8_t x, uint8_t y, struct gui_button_t* this, stru
 
     if (is_object_invalidated(this))
     {
-        zxgui_screen_color(INK_WHITE | BRIGHT | PAPER_BLACK);
+        zxgui_screen_color(COLOR_FG_GREEN | COLOR_BRIGHT | COLOR_BG_BLACK);
         if (this->flags & GUI_FLAG_SYM)
         {
             zxgui_screen_put(x, y, GUI_ICON_SYM);
@@ -30,11 +29,13 @@ static void _button_render(uint8_t x, uint8_t y, struct gui_button_t* this, stru
         {
             x++;
 
-            text_ui_color(INK_WHITE | PAPER_BLACK);
+            text_ui_color(COLOR_FG_WHITE | COLOR_BG_BLACK);
             text_ui_puts_at(x, y, (char *) this->title);
         }
     }
 }
+
+extern uint8_t is_alt_key_pressed();
 
 static uint8_t _button_event(enum gui_event_type event_type, void* event, struct gui_button_t* this, struct gui_scene_t* scene)
 {
@@ -47,7 +48,7 @@ static uint8_t _button_event(enum gui_event_type event_type, void* event, struct
             {
                 if (this->flags & GUI_FLAG_SYM)
                 {
-                    if (in_KeyPressed(0x4000) == 0)
+                    if (is_alt_key_pressed() == 0)
                     {
                         break;
                     }

@@ -1,9 +1,7 @@
-#include <spectrum.h>
 #include <string.h>
+#include "system.h"
 #include "zxgui.h"
 #include "zxgui_tiles.h"
-
-uint8_t screen_color = 0;
 
 void zxgui_screen_put(uint8_t x, uint8_t y, uint8_t ch) __z88dk_callee
 {

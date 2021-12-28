@@ -5,7 +5,7 @@
 #include "heap.h"
 #include <stdlib.h>
 #include <string.h>
-
+#include "alert.h"
 #include "channels_proto.h"
 #include "channels.h"
 
@@ -23,6 +23,7 @@ struct scene_objects_t
     char label_title[64];
     char description_data[128];
     uint8_t buffer_heap_id;
+    struct channels_alert_buf_t alert;
 };
 
 static struct scene_objects_t* scene_objects = NULL;
@@ -114,8 +115,7 @@ static void get_boards_response(struct proto_process_t* proto)
 
 static void get_boards_error(const char* error)
 {
-    netlog_2("cannot get boards: ", error);
-    switch_alert(error, switch_connect_to_proxy);
+    alert_and_switch_to_connect(error);
 }
 
 uint8_t* obtain_select_buffer(struct gui_select_t* this)
@@ -134,35 +134,82 @@ void switch_channel_view()
     zxgui_scene_init(&scene_objects->scene, NULL);
 
     {
-        zxgui_label_init(&scene_objects->title, XYWH(0, 0, 32, 1), scene_objects->label_title, INK_BLACK | PAPER_WHITE, 0);
+        zxgui_label_init(&scene_objects->title,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 0, 32, 1),
+#else
+            XYWH(0, 0, SCREEN_WIDTH, 1),
+#endif
+            scene_objects->label_title, COLOR_FG_BLACK | COLOR_BG_WHITE, 0);
+
         zxgui_scene_add(&scene_objects->scene, &scene_objects->title);
     }
 
     {
-        zxgui_select_init(&scene_objects->board, XYWH(0, 1, 13, 21), obtain_select_buffer, NULL, board_selected);
+        zxgui_select_init(&scene_objects->board,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 1, 13, 21),
+#else
+            XYWH(0, 1, (SCREEN_WIDTH / 2) - 1, SCREEN_HEIGHT - 3),
+#endif
+            obtain_select_buffer, NULL, board_selected);
+
         zxgui_scene_add(&scene_objects->scene, &scene_objects->board);
     }
 
     {
-        zxgui_form_init(&scene_objects->description_form, XYWH(14, 1, 17, 21), "Description", FORM_STYLE_FRAME);
+        zxgui_form_init(&scene_objects->description_form,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(14, 1, 17, 21),
+#else
+            XYWH(SCREEN_WIDTH / 2, 1, (SCREEN_WIDTH / 2) - 1, SCREEN_HEIGHT - 3),
+#endif
+            "Description", FORM_STYLE_FRAME);
+
         zxgui_scene_add(&scene_objects->scene, &scene_objects->description_form);
 
-        zxgui_label_init(&scene_objects->description, XYWH(1, 1, 14, 17), scene_objects->description_data, INK_WHITE | PAPER_BLACK, GUI_FLAG_MULTILINE);
+        zxgui_label_init(&scene_objects->description,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(1, 1, 14, 17),
+#else
+            XYWH(1, 1, (SCREEN_WIDTH / 2) - 3, SCREEN_HEIGHT - 6),
+#endif
+            scene_objects->description_data, COLOR_FG_WHITE | COLOR_BG_BLACK, GUI_FLAG_MULTILINE);
+
         zxgui_form_add_child(&scene_objects->description_form, &scene_objects->description);
     }
 
     {
-        zxgui_button_init(&scene_objects->button_cancel, XYWH(0, 23, 4, 1), 13, GUI_ICON_RETURN, "SELECT", proceed_with_selection);
+        zxgui_button_init(&scene_objects->button_cancel,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 23, 4, 1),
+#else
+            XYWH(0, SCREEN_HEIGHT - 1, 4, 1),
+#endif
+            13, GUI_ICON_RETURN, "SELECT", proceed_with_selection);
+
         zxgui_scene_add(&scene_objects->scene, &scene_objects->button_cancel);
     }
 
     {
-        zxgui_button_init(&scene_objects->button_back, XYWH(5, 23, 4, 1), 32, GUI_ICON_SPACE, "BACK", go_back);
+        zxgui_button_init(&scene_objects->button_back,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(5, 23, 4, 1),
+#else
+            XYWH(5 * TWO_CHARACTERS_FIT_IN, SCREEN_HEIGHT - 1, 4, 1),
+#endif
+            32, GUI_ICON_SPACE, "BACK", go_back);
         zxgui_scene_add(&scene_objects->scene, &scene_objects->button_back);
     }
 
     {
-        zxgui_button_init(&scene_objects->button_settings, XYWH(9, 23, 4, 1), 'c', GUI_ICON_C, "CHANNEL SETTINGS", open_channel_settings);
+        zxgui_button_init(&scene_objects->button_settings,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(9, 23, 4, 1),
+#else
+            XYWH(9 * TWO_CHARACTERS_FIT_IN, SCREEN_HEIGHT - 1, 4, 1),
+#endif
+            'c', GUI_ICON_C, "CHANNEL SETTINGS", open_channel_settings);
         zxgui_scene_add(&scene_objects->scene, &scene_objects->button_settings);
     }
 
@@ -187,5 +234,5 @@ void switch_channel_view()
         return;
     }
 
-    switch_progress("Fetching Boards", NULL);
+    switch_progress("Fetching Boards");
 }

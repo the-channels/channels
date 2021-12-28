@@ -1,5 +1,10 @@
 #include <string.h>
 #include "zxgui.h"
+#include "system.h"
+
+#ifdef HAS_SYS_TIME
+#include <sys/time.h>
+#endif
 
 static void _icon_render(uint8_t x, uint8_t y, struct gui_animated_icon_t* this, struct gui_scene_t* scene)
 {
@@ -16,12 +21,31 @@ static void _icon_render(uint8_t x, uint8_t y, struct gui_animated_icon_t* this,
         return;
     }
 
-    if (is_object_invalidated(this) || this->time++ < this->speed)
+    if (is_object_invalidated(this))
     {
         return;
     }
 
+#ifdef HAS_SYS_TIME
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    time_t time_now = now.tv_sec * 1000 + (now.tv_usec / 1000);
+
+    if (time_now < this->time + this->speed)
+    {
+        return;
+    }
+
+    this->time = time_now;
+
+#else
+    if (this->time++ < this->speed)
+    {
+        return;
+    }
     this->time = 0;
+#endif
+
     this->current_frame++;
     if (this->current_frame >= this->frames)
     {
@@ -33,7 +57,7 @@ static void _icon_render(uint8_t x, uint8_t y, struct gui_animated_icon_t* this,
 }
 
 void zxgui_animated_icon_init(struct gui_animated_icon_t* icon, xywh_t xywh,
-    uint8_t frames, uint8_t color, const uint8_t* source, uint8_t speed) ZXGUI_CDECL
+    uint8_t frames, uint8_t color, const uint8_t* source, animation_speed_t speed) ZXGUI_CDECL
 {
     zxgui_base_init(icon, xywh, _icon_render, NULL);
 

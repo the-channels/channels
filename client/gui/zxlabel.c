@@ -1,7 +1,7 @@
 
 #include <string.h>
 #include "zxgui.h"
-#include <spectrum.h>
+#include "system.h"
 #include <text_ui.h>
 
 static void _label_render(uint8_t x, uint8_t y, struct gui_label_t* this, struct gui_scene_t* scene)
@@ -37,7 +37,7 @@ static void _label_render(uint8_t x, uint8_t y, struct gui_label_t* this, struct
             {
                 if (*c == '>' && (*(c + 1) != '>'))
                 {
-                    text_ui_color(INK_GREEN | PAPER_BLACK);
+                    text_ui_color(COLOR_FG_GREEN | COLOR_BG_BLACK);
                 }
                 else
                 {

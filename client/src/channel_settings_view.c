@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "proto_asserts.h"
+#include "alert.h"
 
 #include "channels_proto.h"
 #include "channels.h"
@@ -32,6 +33,7 @@ struct scene_objects_t
     uint8_t current_setting;
     uint8_t ignore_first_entry;
     char label_title[64];
+    struct channels_alert_buf_t alert;
 };
 
 static struct scene_objects_t* scene_objects = NULL;
@@ -87,7 +89,7 @@ static void get_defs_response(struct proto_process_t* proto)
         proto_assert_str(no_settings, "Cannot allocate settings");
 
         zxgui_label_init(no_settings, XYWH(0, 2, 32, 1),
-            "This channel has no settings.", INK_YELLOW | PAPER_BLACK, 0);
+            "This channel has no settings.", COLOR_FG_YELLOW | COLOR_BG_BLACK, 0);
         zxgui_scene_add(&scene_objects->scene, no_settings);
     }
     else
@@ -101,7 +103,7 @@ static void get_defs_response(struct proto_process_t* proto)
             struct gui_label_t* description = alloc_heap(sizeof(struct gui_label_t));
             proto_assert_str(description, "Cannot allocate description");
             zxgui_label_init(description,
-                get_xywh(0, offset, 32, 1), def->description, INK_WHITE | PAPER_BLACK, 0);
+                get_xywh(0, offset, SCREEN_WIDTH, 1), def->description, COLOR_FG_WHITE | COLOR_BG_BLACK, 0);
             zxgui_scene_add(&scene_objects->scene, description);
 
             offset += 1;
@@ -109,7 +111,7 @@ static void get_defs_response(struct proto_process_t* proto)
             struct gui_edit_t* value_edit = alloc_heap(sizeof(struct gui_edit_t));
             proto_assert_str(description, "Cannot allocate value_edit");
             def->editor = value_edit;
-            zxgui_edit_init(value_edit, get_xywh(0, offset, 30, 2), def->value, 128);
+            zxgui_edit_init(value_edit, get_xywh(0, offset, SCREEN_WIDTH - 2, 2), def->value, 128);
             zxgui_scene_add(&scene_objects->scene, value_edit);
 
             if (scene_objects->scene.focus == NULL)
@@ -126,7 +128,7 @@ static void get_defs_response(struct proto_process_t* proto)
 
 static void get_defs_error(const char* error)
 {
-    switch_alert(error, switch_channel_view);
+    switch_alert(&scene_objects->alert, error, switch_channel_view);
 }
 
 static void process_save_settings_def(ChannelObject* object)
@@ -172,7 +174,7 @@ static void save_settings(struct gui_button_t* this)
         return;
     }
 
-    switch_progress("Saving Settings", NULL);
+    switch_progress("Saving Settings");
 }
 
 static void select_entry(uint8_t new_entry)
@@ -227,30 +229,65 @@ extern void switch_channel_settings_view()
     zxgui_scene_init(&scene_objects->scene, NULL);
 
     {
-        zxgui_label_init(&scene_objects->title, XYWH(0, 0, 32, 1), scene_objects->label_title, INK_BLACK | PAPER_WHITE, 0);
+        zxgui_label_init(&scene_objects->title,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 0, 32, 1),
+#else
+            XYWH(0, 0, SCREEN_WIDTH, 1),
+#endif
+            scene_objects->label_title, COLOR_FG_BLACK | COLOR_BG_WHITE, 0);
+
         zxgui_scene_add(&scene_objects->scene, &scene_objects->title);
     }
 
     {
-        zxgui_label_init(&scene_objects->warning, XYWH(0, 21, 32, 2),
+        zxgui_label_init(&scene_objects->warning,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 21, 32, 2),
+#else
+            XYWH(0, SCREEN_HEIGHT - 3, SCREEN_WIDTH, 2),
+#endif
             "WARNING: Settings are sent and stored to the hub in clear text. "
             "Prefer to run your own hub on your local area network.",
-             BRIGHT | INK_BLACK | PAPER_RED, GUI_FLAG_MULTILINE);
+             COLOR_BRIGHT | COLOR_FG_BLACK | COLOR_BG_RED, GUI_FLAG_MULTILINE);
+
         zxgui_scene_add(&scene_objects->scene, &scene_objects->warning);
     }
 
     {
-        zxgui_button_init(&scene_objects->button_back, XYWH(0, 23, 4, 1), 13, GUI_ICON_RETURN, "SAVE", save_settings);
+        zxgui_button_init(&scene_objects->button_back,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(0, 23, 4, 1),
+#else
+            XYWH(0, SCREEN_HEIGHT - 1, TWO_CHARACTERS_FIT_IN * 4, 1),
+#endif
+            13, GUI_ICON_RETURN, "SAVE", save_settings);
+
         zxgui_scene_add(&scene_objects->scene, &scene_objects->button_back);
     }
 
     {
-        zxgui_button_init(&scene_objects->button_next, XYWH(4, 23, 1, 1), 10, GUI_ICON_MORE_TO_FOLLOW, "NEXT", next_entry);
+        zxgui_button_init(&scene_objects->button_next,
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(4, 23, 1, 1),
+#else
+            XYWH(TWO_CHARACTERS_FIT_IN * 4, SCREEN_HEIGHT - 1, TWO_CHARACTERS_FIT_IN * 4, 1),
+#endif
+            10, GUI_ICON_MORE_TO_FOLLOW, "NEXT", next_entry);
+
         zxgui_scene_add(&scene_objects->scene, &scene_objects->button_next);
     }
 
     {
-        zxgui_button_init(&scene_objects->button_prev, XYWH(8, 23, 1, 1), 11, GUI_ICON_LESS_TO_FOLLOW, "PREV", prev_entry);
+        zxgui_button_init(&scene_objects->button_prev,
+
+#ifdef STATIC_SCREEN_SIZE
+            XYWH(8, 23, 1, 1),
+#else
+            XYWH(TWO_CHARACTERS_FIT_IN * 8, SCREEN_HEIGHT - 1, TWO_CHARACTERS_FIT_IN * 4, 1),
+#endif
+            11, GUI_ICON_LESS_TO_FOLLOW, "PREV", prev_entry);
+
         zxgui_scene_add(&scene_objects->scene, &scene_objects->button_prev);
     }
 
@@ -264,5 +301,5 @@ extern void switch_channel_settings_view()
         return;
     }
 
-    switch_progress("Fetching Settings", NULL);
+    switch_progress("Fetching Settings");
 }

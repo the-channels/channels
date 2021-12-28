@@ -21,7 +21,7 @@ int netlog_init(int port)
 
     netlog_remoteaddr.sin_family= AF_INET;
     netlog_remoteaddr.sin_port = htons(port);
-    netlog_remoteaddr.sin_addr.s_addr = he->h_addr;
+    netlog_remoteaddr.sin_addr.s_addr = (in_addr_t)he->h_addr;
 
     netlog_socket = socket(AF_INET, SOCK_DGRAM, 0);
     return netlog_socket;
@@ -31,7 +31,8 @@ void netlog(const char* data)
 {
     if (netlog_socket == -1) return;
 
-    sendto(netlog_socket, (void*)data, strlen(data), 0, &netlog_remoteaddr, sizeof(netlog_remoteaddr));
+    sendto(netlog_socket, (void*)data, strlen(data), 0,
+        (const struct sockaddr *)&netlog_remoteaddr, sizeof(netlog_remoteaddr));
 }
 
 extern void netlog_1(const char *a)

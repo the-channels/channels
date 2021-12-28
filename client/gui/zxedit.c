@@ -3,80 +3,29 @@
 #include "zxgui.h"
 #include "text_ui.h"
 #include <stdint.h>
-#include <spectrum.h>
+#include "system.h"
 
-static uint32_t blink = 0;
+#ifdef HAS_SYS_TIME
+#include <sys/time.h>
+time_t blink = 0;
+#else
+static int blink = 0;
+#endif
 
-static void _render_blink_even(uint8_t *addr) __z88dk_fastcall __naked
+#ifndef __SPECTRUM
+static uint32_t blink_flip = 0;
+#endif
+
+
+static void set_cursor_addresses(struct gui_edit_t* this, uint8_t x, uint8_t y) __z88dk_callee
 {
-#asm
-    ld b, 8
-_render_blink_even_loop:
-    ld a, (hl)
-    xor $0F
-    ld (hl), a
-    inc h
-    dec b
-    jp nz, _render_blink_even_loop
-    ret
-#endasm
-}
-
-static void _render_blink_odd(uint8_t *addr) __z88dk_fastcall __naked
-{
-#asm
-    ld b, 8
-_render_blink_odd_loop:
-    ld a, (hl)
-    xor $F0
-    ld (hl), a
-    inc h
-    dec b
-    jp nz, _render_blink_odd_loop
-    ret
-#endasm
-}
-
-static void _clear_blink_even(uint8_t *addr) __z88dk_fastcall __naked
-{
-#asm
-    ld b, 8
-_clear_blink_even_loop:
-    ld a, (hl)
-    and $F0
-    ld (hl), a
-    inc h
-    dec b
-    jp nz, _clear_blink_even_loop
-    ret
-#endasm
-}
-
-static void _clear_blink_odd(uint8_t *addr) __z88dk_fastcall __naked
-{
-#asm
-    ld b, 8
-_clear_blink_odd_loop:
-    ld a, (hl)
-    and $0F
-    ld (hl), a
-    inc h
-    dec b
-    jp nz, _clear_blink_odd_loop
-    ret
-#endasm
-}
-
-static void clear_blink(struct gui_edit_t* this) __z88dk_fastcall
-{
-    if (this->cursor_even)
-    {
-        _clear_blink_even(this->cursor_pixels_addr);
-    }
-    else
-    {
-        _clear_blink_odd(this->cursor_pixels_addr);
-    }
+#ifdef __SPECTRUM
+    this->cursor_pixels_addr = zx_cxy2saddr(x, y);
+    this->cursor_color_addr = zx_cxy2aaddr(x, y);
+#else
+    this->cursor_x = x;
+    this->cursor_y = y;
+#endif
 }
 
 static void _edit_render(uint8_t x, uint8_t y, struct gui_edit_t* this, struct gui_scene_t* scene)
@@ -87,107 +36,121 @@ static void _edit_render(uint8_t x, uint8_t y, struct gui_edit_t* this, struct g
     uint8_t flags = is_object_invalidated(this);
     if (flags)
     {
-        uint8_t c = (scene->focus == (void*)this) ? (INK_YELLOW | PAPER_BLACK) : (INK_WHITE | PAPER_BLACK);
+        uint8_t col = (scene->focus == (void*)this) ? (COLOR_BRIGHT | COLOR_FG_YELLOW | COLOR_BG_BLACK) : (COLOR_BRIGHT | COLOR_FG_WHITE | COLOR_BG_BLACK);
 
         if (flags & GUI_FLAG_DIRTY)
         {
-            zxgui_rectangle(BRIGHT | c,
+            zxgui_rectangle(col,
                 x - 1, y - 1, this->w, this->h, GUI_EDIT_LEFT_BOTTOM_CORNER);
         }
 
-        zxgui_screen_color(PAPER_BLACK | INK_BLACK);
+        zxgui_screen_color(COLOR_BG_BLACK | COLOR_FG_BLACK);
+        text_ui_color(col);
 
-        if (this->value[0])
+        if ((this->flags & GUI_FLAG_MULTILINE) && this->value[0])
         {
-            text_ui_color(BRIGHT | c);
+            char* c = (char*)this->value;
+            const char* end = c + strlen(c);
+            uint8_t w = this->w - 2;
+            uint8_t offset_y = y;
+            uint8_t max_offset_y = y + this->h - 1;
+            uint8_t last_line_len = 0;
 
-            if (this->flags & GUI_FLAG_MULTILINE)
+            do
             {
-                char* c = (char*)this->value;
-                const char* end = c + strlen(c);
-                uint8_t w = this->w - 1;
-                uint8_t offset_y = 0;
-                uint8_t max_offset_y = this->h - 1;
-                uint8_t last_line_len = 0;
+                char* next_line = text_ui_buffer_partition(c, (uint16_t) (end - c), w);
 
-                do
+                if (c != next_line)
                 {
-                    char* next_line = text_ui_buffer_partition(c, (uint16_t) (end - c), w);
-
-                    if (c != next_line)
-                    {
-                        last_line_len = next_line - c;
-                        uint8_t text_l = (last_line_len >> 1) + (last_line_len & 0x01);
-                        zxgui_screen_clear(x + text_l, y + offset_y, this->w - 1 - text_l, 1);
-                        text_ui_write_at(x, y + offset_y, c, last_line_len);
-                    }
-
-                    if (*next_line == '\n')
-                    {
-                        next_line++;
-                        last_line_len = 0;
-                    }
-
-                    offset_y++;
-                    if (offset_y >= max_offset_y)
-                    {
-                        break;
-                    }
-                    c = next_line;
-                } while (c < end);
-
-                uint8_t xx = x + (last_line_len >> 1);
-
-                if (offset_y < max_offset_y)
-                {
-                    zxgui_screen_clear(x, y + offset_y, this->w - 1, 1);
+                    last_line_len = next_line - c;
+#if CHARACTERS_PER_CELL == (2)
+                    uint8_t text_l = (last_line_len >> 1) + (last_line_len & 0x01);
+#else
+                    uint8_t text_l = last_line_len;
+#endif
+                    zxgui_screen_clear(x + text_l, offset_y, this->w - 1 - text_l, 1);
+                    text_ui_write_at(x, offset_y, c, last_line_len);
                 }
 
-                this->last_text_height = offset_y;
-
-                if (last_line_len != 0)
+                if (*next_line == '\n')
                 {
-                    offset_y--;
+                    next_line++;
+                    last_line_len = 0;
                 }
 
-                this->cursor_even = (last_line_len & 0x01);
-                this->cursor_pixels_addr = zx_cxy2saddr(xx, y + offset_y);
-                this->cursor_color_addr = zx_cxy2aaddr(xx, y + offset_y);
-            }
-            else
+                offset_y++;
+                if (offset_y >= max_offset_y)
+                {
+                    break;
+                }
+                c = next_line;
+            } while (c < end);
+
+#if CHARACTERS_PER_CELL == (2)
+            uint8_t xx = x + (last_line_len >> 1);
+#else
+            uint8_t xx = x + last_line_len;
+#endif
+
+            if (offset_y < max_offset_y)
             {
-
-                uint8_t w = strlen((char *) this->value);
-
-                uint8_t half_w = (w >> 1);
-                uint8_t xx = x + half_w;
-
-                zxgui_screen_clear(x + half_w, y, this->w - 1 - half_w, 1);
-                text_ui_write_at(x, y, this->value, w);
-
-                this->cursor_even = (w & 0x01);
-                this->cursor_pixels_addr = zx_cxy2saddr(xx, y);
-                this->cursor_color_addr = zx_cxy2aaddr(xx, y);
+                zxgui_screen_clear(x, offset_y, this->w - 1, 1);
             }
+
+            if (last_line_len != 0)
+            {
+                offset_y--;
+            }
+
+#ifdef __SPECTRUM
+            this->cursor_even = (last_line_len & 0x01);
+#endif
+            set_cursor_addresses(this, xx, offset_y);
         }
         else
         {
-            zxgui_screen_clear(x, y, this->w - 1, this->h - 1);
+            uint8_t w = strlen((char *) this->value);
 
-            this->cursor_even = 0;
-            this->cursor_pixels_addr = zx_cxy2saddr(x, y);
-            this->cursor_color_addr = zx_cxy2aaddr(x, y);
+#if CHARACTERS_PER_CELL == (2)
+            uint8_t half_w = (w >> 1);
+#else
+            uint8_t half_w = w;
+#endif
+            uint8_t xx = x + half_w;
+
+            zxgui_screen_clear(xx, y, this->w - 1 - half_w, 1);
+            if (this->value[0])
+            {
+                text_ui_write_at(x, y, this->value, w);
+            }
+#ifdef __SPECTRUM
+            this->cursor_even = (w & 0x01);
+#endif
+            set_cursor_addresses(this, xx, y);
         }
-
-        blink = 100;
+        blink = BLINK_INTERVAL;
     }
 
     if (scene->focus == (void*)this)
     {
-        if (blink++ > 100)
-        {
-            blink = 0;
+#ifdef HAS_SYS_TIME
+        struct timeval now;
+        gettimeofday(&now, NULL);
+        time_t time_now = now.tv_sec * 1000 + (now.tv_usec / 1000);
 
+        if (time_now > blink + BLINK_INTERVAL)
+#else
+        if (blink++ > BLINK_INTERVAL)
+#endif
+
+        {
+#ifdef HAS_SYS_TIME
+            blink = time_now;
+#else
+            blink = 0;
+#endif
+
+#ifdef __SPECTRUM
             if (this->cursor_even)
             {
                 _render_blink_even(this->cursor_pixels_addr);
@@ -197,7 +160,12 @@ static void _edit_render(uint8_t x, uint8_t y, struct gui_edit_t* this, struct g
                 _render_blink_odd(this->cursor_pixels_addr);
             }
 
-            (*this->cursor_color_addr) = INK_YELLOW | BRIGHT | PAPER_BLACK;
+            (*this->cursor_color_addr) = COLOR_FG_YELLOW | COLOR_BRIGHT | COLOR_BG_BLACK;
+#else
+            blink_flip = !blink_flip;
+            zxgui_screen_color(COLOR_BG_BLACK | COLOR_FG_YELLOW | COLOR_BRIGHT);
+            zxgui_screen_put(this->cursor_x, this->cursor_y, blink_flip ? GUI_EDIT_CURSOR : GUI_ICON_EMPTY);
+#endif
         }
     }
 }
@@ -217,23 +185,25 @@ static uint8_t _edit_event(enum gui_event_type event_type, void* event, struct g
             switch (key)
             {
                 // backspace
-                case 12:
+                case GUI_KEY_CODE_BACKSPACE:
                 {
                     int len = strlen(this->value);
                     if (len)
                     {
+#ifdef __SPECTRUM
                         clear_blink(this);
+#endif
 
                         len--;
                         this->value[len] = 0;
-                        blink = 200;
+                        blink = BLINK_INTERVAL;
 
                         object_invalidate(this, GUI_FLAG_DIRTY_INTERNAL);
                     }
                     return 1;
                 }
                 // enter
-                case 13:
+                case GUI_KEY_CODE_RETURN:
                 {
                     if ((this->flags & GUI_FLAG_MULTILINE) == 0)
                     {
@@ -259,18 +229,24 @@ static uint8_t _edit_event(enum gui_event_type event_type, void* event, struct g
                     }
                     if ((this->flags & GUI_FLAG_MULTILINE) == 0)
                     {
+#if CHARACTERS_PER_CELL == (2)
                         if (len >= ((this->w - 1) << 1))
+#else
+                        if (len >= this->w - 1)
+#endif
                         {
                             return 0;
                         }
                     }
 
+#ifdef __SPECTRUM
                     clear_blink(this);
+#endif
 
                     this->value[len] = key;
                     len++;
                     this->value[len] = 0;
-                    blink = 200;
+                    blink = BLINK_INTERVAL;
 
                     object_invalidate(this, GUI_FLAG_DIRTY_INTERNAL);
 
