@@ -56,6 +56,19 @@ and the Hub would detect it.
 ## Channels Proto
 A client and the hub communicate via a special protocol, as described in [this document](./proto/Readme.md).
 
+## Architecture support
+
+Channels client can be build for zx spectrum (`make`), but also it can be compiled for desktop (`make ARCH=desktop`) as a terminal.
+There is not much point in having such a limited browser for PC, but it showcases the project could be build for implemented platforms.
+
+The platform-specific files are located in `arch/<platform>`, files in that location need to satisfy various symbols that system needs,
+like `get_device_unique_key`.
+
+The `include/system.h` has various platform-specific defines (like `STACKLESS_PROCESS`) 
+that shared code could use for `#ifdef` statements.
+
+For network capabilities, the system expects POSIX-like sockets to be implemented.
+
 ## How to build from source
 * The Hub is simply compiled using CMake. 
 * Take care to fetch all submodules.
@@ -138,6 +151,7 @@ First time thing could be slow, so have some patience.
 
 ### Debugging the client
 
+* To build with debugging symbols, use `make DEBUG=1`
 * The only way to debug the client is to use netlog, a printf-alike function that
 sends printed text to UDP port 9468 on the same host as proxy.
 * To see these logs on Linux/Mac, simply do `make listen-for-logs` while
