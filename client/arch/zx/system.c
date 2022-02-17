@@ -26,7 +26,7 @@ static void get_mounted_path(char* into) __z88dk_fastcall __naked
 
     pop hl
     ld de, hl               ;// load 'into' into de
-    ld a, $00	            ;// get 'AM_FS0' option
+    ld a, ($3F6F)	        ;// get 'v_vfs_curmount'
     ld hl, $FE03            ;// CFG_GETCFSTRING
     rst $28                 ;// MODULECALL_NOPAGE
     jr c, no_option
