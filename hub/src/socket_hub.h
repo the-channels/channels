@@ -14,7 +14,7 @@ public:
     int run() override;
 
 private:
-    void accept();
+    bool accept();
     void process_socket(int socket);
 
     static void* start_request(int socket, struct proto_process_t* proto);

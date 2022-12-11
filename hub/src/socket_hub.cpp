@@ -618,7 +618,7 @@ void SocketChannelHub::process_socket(int socket)
     client_released(socket);
 }
 
-void SocketChannelHub::accept()
+bool SocketChannelHub::accept()
 {
     struct sockaddr_in clientname;
 #ifdef WIN32
@@ -632,7 +632,7 @@ void SocketChannelHub::accept()
     if (sock < 0)
     {
         std::cout << "Accept error: " << sock << std::endl;
-        return;
+        return false;
     }
 
     if (IsDebug())
@@ -649,6 +649,7 @@ void SocketChannelHub::accept()
         connection_thread.detach();
     }
 
+    return true;
 }
 
 int SocketChannelHub::run()
@@ -664,8 +665,11 @@ int SocketChannelHub::run()
 
     py::gil_scoped_release guard{};
 
-    while (1)
+    while (true)
     {
-        accept();
+        if (!accept())
+        {
+            return 1;
+        }
     }
 }
